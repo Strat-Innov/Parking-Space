@@ -75,9 +75,20 @@ can each act in any order — that independence is the whole point of BR-006.
   `effectiveStartDate` has passed. Existing rows are never written to again
   after creation.
 - **Cancellation** permissions aren't specified in the doc beyond "reachable
-  from any non-terminal state." This build allows the owning requester or
-  any staff role to cancel, while a request is not yet `Completed` or
-  `Cancelled`.
+  from any non-terminal state." This build allows the owning requestor or
+  staff roles other than Prepared By to cancel (Prepared By prepares/edits
+  or endorses a request — cancelling it isn't their call), while a request
+  is not yet `Completed` or `Cancelled`.
+- **Prepared By can edit the intake fields** the requestor submitted, while
+  `Status = "In Preparation"` (`updateRequestDetails` in
+  `src/lib/workflows.ts`, `POST /api/requests/[id]/edit`). This is not a
+  BR-003 violation — BR-003 revokes the *requestor's* edit rights on
+  submission; it says nothing about staff correcting typos or missing
+  details during preparation. Locked the moment the item is endorsed for
+  validation (WF02) or moves beyond, same as every other field past its
+  owning stage. The Approval card (Validated By's decision fields) is
+  hidden from Prepared By's view of a request — that belongs to WF03, a
+  stage they hand off to, not one they need visibility into.
 - **Public submission + `Full Name`**: the doc assumed an authenticated
   "Parker" submitting through Microsoft Lists (Section 5's field list has no
   personal-name field, only Company Name). Once submission needed to be a

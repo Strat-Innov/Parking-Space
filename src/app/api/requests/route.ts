@@ -1,23 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { getSession, requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { submitRequest } from "@/lib/workflows";
 import { handleApiError } from "@/lib/api-helpers";
-import { SERVICE_TYPES } from "@/lib/types";
-
-const createSchema = z.object({
-  fullName: z.string().min(1),
-  companyName: z.string().min(1),
-  emailAddress: z.string().email(),
-  serviceType: z.enum(SERVICE_TYPES),
-  preferredParkingLocation: z.string().min(1),
-  requiredStartDate: z.coerce.date(),
-  endDate: z.coerce.date(),
-  purpose: z.string().min(1),
-});
+import { intakeFieldsSchema } from "@/lib/validation";
 
 // Role-scoped list: each role only sees the requests relevant to its queue,
 // keeping "who should be looking at what" out of the client entirely.
@@ -71,11 +59,11 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
     if (session && session.role !== "REQUESTER") {
-      return NextResponse.json({ error: "Only requesters can submit a new parking request." }, { status: 403 });
+      return NextResponse.json({ error: "Only requestors can submit a new parking request." }, { status: 403 });
     }
 
     const body = await req.json().catch(() => null);
-    const parsed = createSchema.safeParse(body);
+    const parsed = intakeFieldsSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues.map((i) => i.message).join("; ") }, { status: 422 });
     }

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import StatusBadge from "@/components/StatusBadge";
 import Timeline from "@/components/Timeline";
 import RequestActions from "@/components/RequestActions";
+import RequestDetailsForm from "@/components/RequestDetailsForm";
 import type { Role } from "@/lib/types";
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
@@ -36,6 +37,15 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
 
   if (!request) notFound();
   if (session.role === "REQUESTER" && request.requesterId !== session.sub) notFound();
+
+  // Prepared By can correct the requestor's submitted details while it's
+  // still theirs to prepare — not a BR-003 violation, that rule revokes the
+  // REQUESTOR's edit rights, not staff's (see workflows.ts).
+  const canEditDetails = session.role === "PREPARED_BY" && request.status === "In Preparation";
+  // The Approval card belongs to WF03 (Validated By's stage) — Prepared By
+  // has filtered/verified the intake already and hands off from here, so
+  // Validated By's decision fields aren't their concern to see.
+  const showApprovalCard = session.role !== "PREPARED_BY";
 
   const fmt = (d: Date | null) => (d ? new Date(d).toLocaleString() : "—");
   // Daily/Monthly store midnight as an implementation detail (see
@@ -87,44 +97,66 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
         userId={session.sub}
       />
 
-      <div className="card">
-        <h2 className="mb-4 text-lg font-semibold tracking-tight">Request Details</h2>
-        <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-          <Field label="Full Name" value={request.fullName} />
-          <Field label="Email Address" value={request.emailAddress} />
-          <Field label="Service Type" value={request.serviceType} />
-          <Field label="Preferred Location" value={request.preferredParkingLocation} />
-          <Field label="Date of Request" value={fmt(request.dateOfRequest)} />
-          <Field label="Required Start" value={fmtParkingDate(request.requiredStartDate)} />
-          <Field label="End" value={fmtParkingDate(request.endDate)} />
-          <Field label="Purpose" value={request.purpose} />
-          <Field
-            label="Computed Total"
-            value={
-              request.totalHours != null
-                ? `${request.totalHours} hour(s)`
-                : request.totalDays != null
-                ? `${request.totalDays} day(s)`
-                : request.totalMonths != null
-                ? `${request.totalMonths} month(s)`
-                : "—"
-            }
+      {canEditDetails ? (
+        <div>
+          <h2 className="mb-2 text-lg font-semibold tracking-tight">Request Details (editable)</h2>
+          <RequestDetailsForm
+            mode="edit"
+            requestId={request.id}
+            initial={{
+              fullName: request.fullName,
+              companyName: request.companyName,
+              emailAddress: request.emailAddress,
+              serviceType: request.serviceType,
+              preferredParkingLocation: request.preferredParkingLocation,
+              requiredStartDate: request.requiredStartDate,
+              endDate: request.endDate,
+              purpose: request.purpose,
+            }}
           />
-        </dl>
-      </div>
+        </div>
+      ) : (
+        <div className="card">
+          <h2 className="mb-4 text-lg font-semibold tracking-tight">Request Details</h2>
+          <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <Field label="Full Name" value={request.fullName} />
+            <Field label="Email Address" value={request.emailAddress} />
+            <Field label="Service Type" value={request.serviceType} />
+            <Field label="Preferred Location" value={request.preferredParkingLocation} />
+            <Field label="Date of Request" value={fmt(request.dateOfRequest)} />
+            <Field label="Required Start" value={fmtParkingDate(request.requiredStartDate)} />
+            <Field label="End" value={fmtParkingDate(request.endDate)} />
+            <Field label="Purpose" value={request.purpose} />
+            <Field
+              label="Computed Total"
+              value={
+                request.totalHours != null
+                  ? `${request.totalHours} hour(s)`
+                  : request.totalDays != null
+                  ? `${request.totalDays} day(s)`
+                  : request.totalMonths != null
+                  ? `${request.totalMonths} month(s)`
+                  : "—"
+              }
+            />
+          </dl>
+        </div>
+      )}
 
-      <div className="card">
-        <h2 className="mb-4 text-lg font-semibold tracking-tight">Approval</h2>
-        <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-          <Field label="Approval Decision" value={request.approvalDecision} />
-          <Field label="Validated By" value={request.validatedBy?.name} />
-          <Field label="Validated Date" value={fmt(request.validatedDate)} />
-          <Field label="Rejection Count" value={request.rejectionCount} />
-          <Field label="Rejection Reason (latest)" value={request.rejectionReason} />
-          <Field label="Rejected By (latest)" value={request.rejectedBy?.name} />
-          <Field label="Rejected Date (latest)" value={fmt(request.rejectedDate)} />
-        </dl>
-      </div>
+      {showApprovalCard && (
+        <div className="card">
+          <h2 className="mb-4 text-lg font-semibold tracking-tight">Approval</h2>
+          <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <Field label="Approval Decision" value={request.approvalDecision} />
+            <Field label="Validated By" value={request.validatedBy?.name} />
+            <Field label="Validated Date" value={fmt(request.validatedDate)} />
+            <Field label="Rejection Count" value={request.rejectionCount} />
+            <Field label="Rejection Reason (latest)" value={request.rejectionReason} />
+            <Field label="Rejected By (latest)" value={request.rejectedBy?.name} />
+            <Field label="Rejected Date (latest)" value={fmt(request.rejectedDate)} />
+          </dl>
+        </div>
+      )}
 
       <div className="grid gap-6 sm:grid-cols-2">
         <div className="card">

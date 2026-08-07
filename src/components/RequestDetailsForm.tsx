@@ -1,57 +1,90 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { SERVICE_TYPES } from "@/lib/types";
+import { toDateStr, toTimeStr, minEndDateFor } from "@/lib/parking-date-helpers";
 
-export default function NewRequestForm() {
-  const [submittedId, setSubmittedId] = useState<string | null>(null);
-  const [form, setForm] = useState({
+export type RequestDetailsFormInitial = {
+  fullName: string;
+  companyName: string;
+  emailAddress: string;
+  serviceType: string;
+  preferredParkingLocation: string;
+  requiredStartDate: string | Date;
+  endDate: string | Date;
+  purpose: string;
+};
+
+type FormState = {
+  fullName: string;
+  companyName: string;
+  emailAddress: string;
+  serviceType: string;
+  preferredParkingLocation: string;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  startTime: string; // HH:mm — Hourly's Start Time, or the single shared Daily/Monthly check-in time
+  endTime: string; // HH:mm — Hourly only
+  purpose: string;
+};
+
+function blankForm(): FormState {
+  return {
     fullName: "",
     companyName: "",
     emailAddress: "",
     serviceType: "Daily",
     preferredParkingLocation: "",
-    startDate: "", // YYYY-MM-DD
-    endDate: "", // YYYY-MM-DD
-    startTime: "", // HH:mm — Hourly's Start Time, or the single shared Daily/Monthly check-in time
-    endTime: "", // HH:mm — Hourly only, independent End Time
+    startDate: "",
+    endDate: "",
+    startTime: "",
+    endTime: "",
     purpose: "",
-  });
+  };
+}
+
+function fromInitial(initial: RequestDetailsFormInitial): FormState {
+  const start = new Date(initial.requiredStartDate);
+  const end = new Date(initial.endDate);
+  const isHourly = initial.serviceType === "Hourly";
+  return {
+    fullName: initial.fullName,
+    companyName: initial.companyName,
+    emailAddress: initial.emailAddress,
+    serviceType: initial.serviceType,
+    preferredParkingLocation: initial.preferredParkingLocation,
+    startDate: toDateStr(start),
+    endDate: toDateStr(end),
+    startTime: toTimeStr(start),
+    endTime: isHourly ? toTimeStr(end) : "",
+    purpose: initial.purpose,
+  };
+}
+
+export default function RequestDetailsForm({
+  mode,
+  requestId,
+  initial,
+  onSaved,
+}: {
+  mode: "create" | "edit";
+  requestId?: string;
+  initial?: RequestDetailsFormInitial;
+  onSaved?: () => void;
+}) {
+  const router = useRouter();
+  const [submittedId, setSubmittedId] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [form, setForm] = useState<FormState>(initial ? fromInitial(initial) : blankForm());
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const isHourly = form.serviceType === "Hourly";
 
-  function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
+  function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
-  }
-
-  function toDateStr(d: Date) {
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  }
-  function addDaysStr(dateStr: string, days: number) {
-    const d = new Date(`${dateStr}T00:00:00`);
-    d.setDate(d.getDate() + days);
-    return toDateStr(d);
-  }
-  function addMonthsStr(dateStr: string, months: number) {
-    const d = new Date(`${dateStr}T00:00:00`);
-    d.setMonth(d.getMonth() + months);
-    return toDateStr(d);
-  }
-
-  // Minimum valid End Date depends on Service Type: Hourly can be same-day
-  // (duration comes from Start/End Time instead); Daily needs at least the
-  // next calendar day (Start Date's check-in time now carries onto End Date
-  // too, so same-day would be zero duration); Monthly needs a full calendar
-  // month, not just "later" (this was the reported bug — a few days into
-  // the same month was being accepted as a "monthly" booking).
-  function minEndDateFor(startDate: string, serviceType: string) {
-    if (!startDate) return startDate;
-    if (serviceType === "Monthly") return addMonthsStr(startDate, 1);
-    if (serviceType === "Daily") return addDaysStr(startDate, 1);
-    return startDate; // Hourly
+    setSaved(false);
   }
 
   function updateStartDate(value: string) {
@@ -60,6 +93,7 @@ export default function NewRequestForm() {
       const endStillValid = f.endDate && value && f.endDate >= min;
       return { ...f, startDate: value, endDate: endStillValid ? f.endDate : "" };
     });
+    setSaved(false);
   }
 
   function updateServiceType(value: string) {
@@ -73,6 +107,7 @@ export default function NewRequestForm() {
       const endStillValid = f.endDate && f.startDate && f.endDate >= min;
       return { ...f, serviceType: value, endDate: endStillValid ? f.endDate : "", endTime: "" };
     });
+    setSaved(false);
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -87,23 +122,33 @@ export default function NewRequestForm() {
       const requiredStartDate = `${form.startDate}T${form.startTime}`;
       const endDate = isHourly ? `${form.endDate}T${form.endTime}` : `${form.endDate}T${form.startTime}`;
 
-      const res = await fetch("/api/requests", {
+      const payload = {
+        fullName: form.fullName,
+        companyName: form.companyName,
+        emailAddress: form.emailAddress,
+        serviceType: form.serviceType,
+        preferredParkingLocation: form.preferredParkingLocation,
+        requiredStartDate,
+        endDate,
+        purpose: form.purpose,
+      };
+
+      const url = mode === "create" ? "/api/requests" : `/api/requests/${requestId}/edit`;
+      const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fullName: form.fullName,
-          companyName: form.companyName,
-          emailAddress: form.emailAddress,
-          serviceType: form.serviceType,
-          preferredParkingLocation: form.preferredParkingLocation,
-          requiredStartDate,
-          endDate,
-          purpose: form.purpose,
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Submission failed");
-      setSubmittedId(data.request.id);
+
+      if (mode === "create") {
+        setSubmittedId(data.request.id);
+      } else {
+        setSaved(true);
+        router.refresh();
+        onSaved?.();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Submission failed");
     } finally {
@@ -237,8 +282,8 @@ export default function NewRequestForm() {
             className="w-40"
           />
           <p className="mt-1 text-xs text-slate-500">
-            Your check-in time — applied to both the start and end date, so the parking period is a real 24-hour cycle from this
-            time rather than midnight.
+            Check-in time — applied to both the start and end date, so the parking period is a real 24-hour cycle from this time
+            rather than midnight.
           </p>
         </div>
       )}
@@ -249,9 +294,10 @@ export default function NewRequestForm() {
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
+      {saved && !error && <p className="text-sm text-emerald-600">Saved.</p>}
 
       <button type="submit" disabled={loading} className="btn-primary">
-        {loading ? "Submitting..." : "Submit Request"}
+        {loading ? "Saving..." : mode === "create" ? "Submit Request" : "Save Changes"}
       </button>
     </form>
   );

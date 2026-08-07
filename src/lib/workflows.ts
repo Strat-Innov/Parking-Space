@@ -96,9 +96,12 @@ export type SubmitRequestInput = {
   purpose: string;
 };
 
-export async function submitRequest(input: SubmitRequestInput, requesterId: string) {
-  const dateOfRequest = new Date(); // system-set — BR-003, never taken from the client
-
+// Shared by submitRequest and updateRequestDetails so an edit can never
+// hold the intake fields to a looser standard than the original
+// submission. `dateOfRequest` is the anchor for BR-001/002 either way — on
+// an edit that's the request's ORIGINAL (immutable) Date of Request, not
+// "now", since BR-003 fixes it at submission and edits don't reset it.
+function validateIntakeFields(input: SubmitRequestInput, dateOfRequest: Date) {
   // BR-001 (no backdating) + BR-002 (advance requests only — "no same-day
   // requests" is a CALENDAR-DAY rule, not just "later timestamp"). Now that
   // Required Start Date/End Date carry a time-of-day, comparing raw
@@ -126,6 +129,11 @@ export async function submitRequest(input: SubmitRequestInput, requesterId: stri
       throw new WorkflowError("Monthly bookings need an End Date at least 1 month after the Start Date.", 422);
     }
   }
+}
+
+export async function submitRequest(input: SubmitRequestInput, requesterId: string) {
+  const dateOfRequest = new Date(); // system-set — BR-003, never taken from the client
+  validateIntakeFields(input, dateOfRequest);
 
   const totals = computeTotals(input.serviceType, input.requiredStartDate, input.endDate);
 
@@ -161,8 +169,48 @@ export async function submitRequest(input: SubmitRequestInput, requesterId: stri
 }
 
 // --- WF02 — Prepared By Validation ------------------------------------------------
+//
+// Prepared By can correct the intake fields the requestor submitted (typos,
+// missing details) while the item is still theirs to prepare — this is NOT
+// a BR-003 violation: BR-003 revokes the REQUESTOR's edit rights on
+// submission, it says nothing about staff. Locked the moment the item
+// leaves "In Preparation" (endorsed for validation, or beyond), same as
+// every other field on this record past its owning stage.
 
-export async function wf02MarkReadyForApproval(requestId: string, actor: SessionPayload) {
+export async function updateRequestDetails(requestId: string, actor: SessionPayload, input: SubmitRequestInput) {
+  if (actor.role !== "PREPARED_BY") throw new WorkflowError("Only Prepared By can edit request details.", 403);
+
+  return prisma.$transaction(async (tx) => {
+    const req = await tx.parkingRequest.findUniqueOrThrow({ where: { id: requestId } });
+    if (req.status !== "In Preparation") {
+      throw new WorkflowError('Details can only be edited while Status = "In Preparation".', 409);
+    }
+
+    // Anchored to the ORIGINAL Date of Request, not "now" — see
+    // validateIntakeFields' comment.
+    validateIntakeFields(input, req.dateOfRequest);
+    const totals = computeTotals(input.serviceType, input.requiredStartDate, input.endDate);
+
+    const updated = await tx.parkingRequest.update({
+      where: { id: requestId },
+      data: {
+        fullName: input.fullName,
+        companyName: input.companyName,
+        emailAddress: input.emailAddress,
+        serviceType: input.serviceType,
+        preferredParkingLocation: input.preferredParkingLocation,
+        requiredStartDate: input.requiredStartDate,
+        endDate: input.endDate,
+        purpose: input.purpose,
+        ...totals,
+      },
+    });
+    await logEvent(tx, requestId, "WF02", null, null, actor.sub, "Details edited by Prepared By");
+    return updated;
+  });
+}
+
+export async function wf02EndorseForValidation(requestId: string, actor: SessionPayload) {
   if (actor.role !== "PREPARED_BY") throw new WorkflowError("Only Prepared By can advance this request.", 403);
 
   return prisma.$transaction(async (tx) => {
@@ -174,7 +222,7 @@ export async function wf02MarkReadyForApproval(requestId: string, actor: Session
       where: { id: requestId },
       data: { status: "Pending Approval", approvalStage: "Validated By", preparedById: actor.sub },
     });
-    await logEvent(tx, requestId, "WF02", "In Preparation", "Pending Approval", actor.sub, "Prepared-by validation complete");
+    await logEvent(tx, requestId, "WF02", "In Preparation", "Pending Approval", actor.sub, "Endorsed for validation");
     return updated;
   });
 }
@@ -344,7 +392,9 @@ export async function cancelRequest(requestId: string, actor: SessionPayload) {
       throw new WorkflowError(`Cannot cancel a request that is already ${req.status}.`, 409);
     }
     const isOwner = req.requesterId === actor.sub;
-    const isStaff = actor.role !== "REQUESTER";
+    // Prepared By is deliberately excluded — they prepare/endorse or edit
+    // details, but cancellation isn't their call to make.
+    const isStaff = actor.role !== "REQUESTER" && actor.role !== "PREPARED_BY";
     if (!isOwner && !isStaff) throw new WorkflowError("Not permitted to cancel this request.", 403);
 
     const updated = await tx.parkingRequest.update({

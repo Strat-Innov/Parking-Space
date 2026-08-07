@@ -80,10 +80,10 @@ export default function RequestActions({ request, role, userId }: { request: Req
     panels.push(
       <ActionShell
         key="wf02"
-        title="Mark ready for approval (WF02)"
+        title="Endorse for validation (WF02)"
         loading={loading}
         error={error}
-        submitLabel="Mark Ready"
+        submitLabel="Endorse for Validation"
         onSubmit={(e) => {
           e.preventDefault();
           run(() => call(`/api/requests/${request.id}/prepare`));
@@ -188,10 +188,12 @@ export default function RequestActions({ request, role, userId }: { request: Req
     );
   }
 
-  // Cancel — any non-terminal state, staff or the owning requester
+  // Cancel — any non-terminal state, staff (other than Prepared By — see
+  // below) or the owning requestor
   const canCancel =
     request.status !== "Completed" &&
     request.status !== "Cancelled" &&
+    role !== "PREPARED_BY" &&
     (role !== "REQUESTER" || request.requesterId === userId);
   if (canCancel) {
     panels.push(

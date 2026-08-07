@@ -1,4 +1,4 @@
-import NewRequestForm from "@/components/NewRequestForm";
+import RequestDetailsForm from "@/components/RequestDetailsForm";
 
 // Public — this is the page a QR code points at. External companies fill
 // this out with no account and no login; see /api/requests POST for how an
@@ -10,7 +10,7 @@ export default async function NewRequestPage() {
       <p className="mb-6 text-sm text-slate-500">
         Date of Request is set automatically on submission (BR-003) — you can&apos;t back-date or edit it.
       </p>
-      <NewRequestForm />
+      <RequestDetailsForm mode="create" />
     </div>
   );
 }

@@ -49,7 +49,7 @@ export const NON_TERMINAL_STATUSES: Status[] = [
 ];
 
 export const ROLE_LABELS: Record<Role, string> = {
-  REQUESTER: "Requester",
+  REQUESTER: "Requestor",
   PREPARED_BY: "Prepared By",
   VALIDATED_BY: "Validated By",
   CASHIER: "Cashier",
