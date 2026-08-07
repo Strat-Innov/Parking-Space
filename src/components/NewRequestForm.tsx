@@ -1,11 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { SERVICE_TYPES } from "@/lib/types";
 
 export default function NewRequestForm() {
-  const router = useRouter();
+  const [submittedId, setSubmittedId] = useState<string | null>(null);
   const [form, setForm] = useState({
     companyName: "",
     emailAddress: "",
@@ -34,8 +33,7 @@ export default function NewRequestForm() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Submission failed");
-      router.push(`/requests/${data.request.id}`);
-      router.refresh();
+      setSubmittedId(data.request.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Submission failed");
     } finally {
@@ -44,6 +42,21 @@ export default function NewRequestForm() {
   }
 
   const todayPlus1 = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  if (submittedId) {
+    return (
+      <div className="card space-y-3 text-center">
+        <h2 className="text-lg font-semibold tracking-tight">Request submitted</h2>
+        <p className="text-sm text-slate-600">
+          Thanks — your parking request for <strong>{form.companyName}</strong> has been received and is now in review.
+        </p>
+        <p className="text-xs text-slate-400">
+          Reference: <span className="font-mono">{submittedId}</span>
+        </p>
+        <p className="text-xs text-slate-500">Keep this reference for your records. You&apos;ll be contacted at {form.emailAddress}.</p>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={onSubmit} className="card space-y-4">

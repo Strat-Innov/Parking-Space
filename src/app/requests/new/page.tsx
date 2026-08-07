@@ -1,12 +1,9 @@
-import { redirect } from "next/navigation";
-import { getSession } from "@/lib/auth";
 import NewRequestForm from "@/components/NewRequestForm";
 
+// Public — this is the page a QR code points at. External companies fill
+// this out with no account and no login; see /api/requests POST for how an
+// anonymous submission still gets a requesterId under the hood.
 export default async function NewRequestPage() {
-  const session = await getSession();
-  if (!session) redirect("/login");
-  if (session.role !== "REQUESTER") redirect("/dashboard");
-
   return (
     <div className="mx-auto max-w-2xl">
       <h1 className="mb-1 text-2xl font-semibold tracking-tight">New Parking Request</h1>
