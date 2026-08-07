@@ -207,7 +207,7 @@ export default function NewRequestForm() {
             <input
               type="time"
               required
-              disabled={!form.endDate}
+              disabled={!form.startDate}
               value={form.startTime}
               onChange={(e) => update("startTime", e.target.value)}
               className="flex-1"
@@ -231,7 +231,7 @@ export default function NewRequestForm() {
           <input
             type="time"
             required
-            disabled={!form.endDate}
+            disabled={!form.startDate}
             value={form.startTime}
             onChange={(e) => update("startTime", e.target.value)}
             className="w-40"
