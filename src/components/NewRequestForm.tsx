@@ -13,8 +13,8 @@ export default function NewRequestForm() {
     preferredParkingLocation: "",
     startDate: "", // YYYY-MM-DD
     endDate: "", // YYYY-MM-DD
-    startTime: "", // HH:mm — only meaningful/shown for Hourly
-    endTime: "", // HH:mm — only meaningful/shown for Hourly
+    startTime: "", // HH:mm — Hourly's Start Time, or the single shared Daily/Monthly check-in time
+    endTime: "", // HH:mm — Hourly only, independent End Time
     purpose: "",
   });
   const [error, setError] = useState<string | null>(null);
@@ -26,12 +26,52 @@ export default function NewRequestForm() {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
+  function toDateStr(d: Date) {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+  function addDaysStr(dateStr: string, days: number) {
+    const d = new Date(`${dateStr}T00:00:00`);
+    d.setDate(d.getDate() + days);
+    return toDateStr(d);
+  }
+  function addMonthsStr(dateStr: string, months: number) {
+    const d = new Date(`${dateStr}T00:00:00`);
+    d.setMonth(d.getMonth() + months);
+    return toDateStr(d);
+  }
+
+  // Minimum valid End Date depends on Service Type: Hourly can be same-day
+  // (duration comes from Start/End Time instead); Daily needs at least the
+  // next calendar day (Start Date's check-in time now carries onto End Date
+  // too, so same-day would be zero duration); Monthly needs a full calendar
+  // month, not just "later" (this was the reported bug — a few days into
+  // the same month was being accepted as a "monthly" booking).
+  function minEndDateFor(startDate: string, serviceType: string) {
+    if (!startDate) return startDate;
+    if (serviceType === "Monthly") return addMonthsStr(startDate, 1);
+    if (serviceType === "Daily") return addDaysStr(startDate, 1);
+    return startDate; // Hourly
+  }
+
   function updateStartDate(value: string) {
     setForm((f) => {
-      // Clear a now-invalid End Date rather than silently submitting a
-      // start/end pair the server will reject anyway.
-      const endStillValid = f.endDate && value && f.endDate >= value;
+      const min = minEndDateFor(value, f.serviceType);
+      const endStillValid = f.endDate && value && f.endDate >= min;
       return { ...f, startDate: value, endDate: endStillValid ? f.endDate : "" };
+    });
+  }
+
+  function updateServiceType(value: string) {
+    setForm((f) => {
+      // Different types have different valid End Date floors (see
+      // minEndDateFor) and different time-field shapes (Hourly: two
+      // independent pickers; Daily/Monthly: one shared picker) — clear
+      // anything that might now be stale rather than silently carry over a
+      // combination the server would reject anyway.
+      const min = minEndDateFor(f.startDate, value);
+      const endStillValid = f.endDate && f.startDate && f.endDate >= min;
+      return { ...f, serviceType: value, endDate: endStillValid ? f.endDate : "", endTime: "" };
     });
   }
 
@@ -40,12 +80,12 @@ export default function NewRequestForm() {
     setError(null);
     setLoading(true);
     try {
-      // Time-of-day only matters for Hourly (see feedback: for Daily/Monthly
-      // it's more intuitive that the picked dates are all that's asked for —
-      // start of day is an implementation detail, not something a visitor
-      // booking a whole day should have to think about).
-      const requiredStartDate = isHourly ? `${form.startDate}T${form.startTime}` : `${form.startDate}T00:00`;
-      const endDate = isHourly ? `${form.endDate}T${form.endTime}` : `${form.endDate}T00:00`;
+      // Hourly: independent Start/End times. Daily/Monthly: the single
+      // "Time" field is mirrored onto both ends (a real check-in time, not
+      // implicit midnight) so day/month boundaries — and later, overnight
+      // billing — can be computed from it rather than assumed.
+      const requiredStartDate = `${form.startDate}T${form.startTime}`;
+      const endDate = isHourly ? `${form.endDate}T${form.endTime}` : `${form.endDate}T${form.startTime}`;
 
       const res = await fetch("/api/requests", {
         method: "POST",
@@ -71,20 +111,10 @@ export default function NewRequestForm() {
     }
   }
 
-  function toDateStr(d: Date) {
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  }
-
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const minStartDate = toDateStr(tomorrow);
-
-  // Daily/Monthly: End Date can equal Start Date (a same-day, 1-day
-  // booking) — only Hourly needs End strictly after Start, enforced via
-  // the time fields below. Falls back to the Start-Date floor before a
-  // Start Date is picked yet.
-  const minEndDate = form.startDate || minStartDate;
+  const minEndDate = minEndDateFor(form.startDate, form.serviceType) || minStartDate;
 
   // For Hourly, End Time only needs a floor when End Date == Start Date
   // (same-day booking) — a later End Date has no relationship to Start Time.
@@ -126,7 +156,7 @@ export default function NewRequestForm() {
         </div>
         <div className="field">
           <label>Service Type</label>
-          <select value={form.serviceType} onChange={(e) => update("serviceType", e.target.value)}>
+          <select value={form.serviceType} onChange={(e) => updateServiceType(e.target.value)}>
             {SERVICE_TYPES.map((s) => (
               <option key={s} value={s}>
                 {s}
@@ -164,11 +194,13 @@ export default function NewRequestForm() {
           />
         </div>
         <p className="mt-1 text-xs text-slate-500">
-          Start must be a later calendar day than today (BR-001/BR-002 — no backdating, no same-day requests).
+          {form.serviceType === "Monthly"
+            ? "Start must be a later calendar day than today, and End at least 1 month after Start (BR-001/BR-002)."
+            : "Start must be a later calendar day than today (BR-001/BR-002 — no backdating, no same-day requests)."}
         </p>
       </div>
 
-      {isHourly && (
+      {isHourly ? (
         <div className="field">
           <label>Parking Time</label>
           <div className="flex items-center gap-2">
@@ -192,6 +224,22 @@ export default function NewRequestForm() {
             />
           </div>
           <p className="mt-1 text-xs text-slate-500">End Time must be after Start Time on the same day.</p>
+        </div>
+      ) : (
+        <div className="field">
+          <label>Time</label>
+          <input
+            type="time"
+            required
+            disabled={!form.endDate}
+            value={form.startTime}
+            onChange={(e) => update("startTime", e.target.value)}
+            className="w-40"
+          />
+          <p className="mt-1 text-xs text-slate-500">
+            Your check-in time — applied to both the start and end date, so the parking period is a real 24-hour cycle from this
+            time rather than midnight.
+          </p>
         </div>
       )}
 

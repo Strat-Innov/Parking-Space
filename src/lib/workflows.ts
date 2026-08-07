@@ -1,5 +1,5 @@
 import { Prisma, ParkingRequest } from "@prisma/client";
-import { startOfDay } from "date-fns";
+import { startOfDay, addMonths, differenceInCalendarMonths } from "date-fns";
 import { prisma } from "./prisma";
 import type { SessionPayload } from "./auth";
 import type { ServiceType } from "./types";
@@ -21,12 +21,22 @@ type Tx = Prisma.TransactionClient;
 const MS_HOUR = 1000 * 60 * 60;
 const MS_DAY = MS_HOUR * 24;
 
+// Calendar-aware month count — NOT spanMs / 30 days. A fixed 30-day divisor
+// overcharges real 1-month bookings in any 31-day month (Aug 10 -> Sep 10 is
+// 31 real days, so ceil(31/30) = 2 would silently bill two months for what
+// is, by the calendar, exactly one).
+function monthsBetween(start: Date, end: Date): number {
+  let months = differenceInCalendarMonths(end, start);
+  if (addMonths(start, months) < end) months += 1;
+  return Math.max(1, months);
+}
+
 export function computeTotals(serviceType: ServiceType, start: Date, end: Date) {
   const spanMs = end.getTime() - start.getTime();
   const totals = { totalHours: null as number | null, totalDays: null as number | null, totalMonths: null as number | null };
   if (serviceType === "Hourly") totals.totalHours = Math.max(1, Math.ceil(spanMs / MS_HOUR));
   if (serviceType === "Daily") totals.totalDays = Math.max(1, Math.ceil(spanMs / MS_DAY));
-  if (serviceType === "Monthly") totals.totalMonths = Math.max(1, Math.ceil(spanMs / (MS_DAY * 30)));
+  if (serviceType === "Monthly") totals.totalMonths = monthsBetween(start, end);
   return totals;
 }
 
@@ -100,22 +110,21 @@ export async function submitRequest(input: SubmitRequestInput, requesterId: stri
       422
     );
   }
-  // Hourly carries a real time-of-day, so End must be strictly after Start
-  // — equal would silently bill a minimum 1-hour stay (see computeTotals'
-  // Math.max floor) instead of surfacing as the zero-duration span it is.
-  // Daily/Monthly are date-only under the hood (both default to midnight),
-  // so End == Start is a legitimate same-day, 1-unit booking, not a bug.
-  const endMustBeStrictlyAfterStart = input.serviceType === "Hourly";
-  const invalidRange = endMustBeStrictlyAfterStart
-    ? input.endDate <= input.requiredStartDate
-    : input.endDate < input.requiredStartDate;
-  if (invalidRange) {
-    throw new WorkflowError(
-      endMustBeStrictlyAfterStart
-        ? "End Time must be after Start Time."
-        : "End Date cannot be before Required Start Date.",
-      422
-    );
+  // Every service type now carries a real time-of-day (Hourly: independent
+  // Start/End times; Daily/Monthly: a single check-in time mirrored onto
+  // both ends — see NewRequestForm) rather than an implicit midnight, so
+  // "End strictly after Start" is a universal rule, not Hourly-only.
+  if (input.endDate <= input.requiredStartDate) {
+    throw new WorkflowError("End must be after Required Start (date and time).", 422);
+  }
+  // Monthly additionally needs a minimum 1-calendar-month span — a few days
+  // into the same month is not a monthly booking (this was the bug: the
+  // generic "after Start" check alone doesn't enforce that).
+  if (input.serviceType === "Monthly") {
+    const minEnd = addMonths(input.requiredStartDate, 1);
+    if (input.endDate < minEnd) {
+      throw new WorkflowError("Monthly bookings need an End Date at least 1 month after the Start Date.", 422);
+    }
   }
 
   const totals = computeTotals(input.serviceType, input.requiredStartDate, input.endDate);
