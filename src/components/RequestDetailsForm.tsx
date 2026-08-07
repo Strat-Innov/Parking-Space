@@ -11,6 +11,7 @@ export type RequestDetailsFormInitial = {
   emailAddress: string;
   serviceType: string;
   preferredParkingLocation: string;
+  requestedSlot?: string | null;
   requiredStartDate: string | Date;
   endDate: string | Date;
   purpose: string;
@@ -22,6 +23,7 @@ type FormState = {
   emailAddress: string;
   serviceType: string;
   preferredParkingLocation: string;
+  requestedSlot: string; // optional — see Prisma schema comment on requestedSlot
   startDate: string; // YYYY-MM-DD
   endDate: string; // YYYY-MM-DD
   startTime: string; // HH:mm — Hourly's Start Time, or the single shared Daily/Monthly check-in time
@@ -36,6 +38,7 @@ function blankForm(): FormState {
     emailAddress: "",
     serviceType: "Daily",
     preferredParkingLocation: "",
+    requestedSlot: "",
     startDate: "",
     endDate: "",
     startTime: "",
@@ -54,6 +57,7 @@ function fromInitial(initial: RequestDetailsFormInitial): FormState {
     emailAddress: initial.emailAddress,
     serviceType: initial.serviceType,
     preferredParkingLocation: initial.preferredParkingLocation,
+    requestedSlot: initial.requestedSlot ?? "",
     startDate: toDateStr(start),
     endDate: toDateStr(end),
     startTime: toTimeStr(start),
@@ -128,6 +132,7 @@ export default function RequestDetailsForm({
         emailAddress: form.emailAddress,
         serviceType: form.serviceType,
         preferredParkingLocation: form.preferredParkingLocation,
+        requestedSlot: form.requestedSlot || undefined,
         requiredStartDate,
         endDate,
         purpose: form.purpose,
@@ -211,9 +216,23 @@ export default function RequestDetailsForm({
         </div>
       </div>
 
-      <div className="field">
-        <label>Preferred Parking Location</label>
-        <input required value={form.preferredParkingLocation} onChange={(e) => update("preferredParkingLocation", e.target.value)} />
+      <div className="grid grid-cols-2 gap-4">
+        <div className="field">
+          <label>Preferred Parking Location</label>
+          <input
+            required
+            value={form.preferredParkingLocation}
+            onChange={(e) => update("preferredParkingLocation", e.target.value)}
+          />
+        </div>
+        <div className="field">
+          <label>Parking Slot Number (optional)</label>
+          <input
+            value={form.requestedSlot}
+            onChange={(e) => update("requestedSlot", e.target.value)}
+            placeholder="e.g. B-14, if you have a preference"
+          />
+        </div>
       </div>
 
       <div className="field">

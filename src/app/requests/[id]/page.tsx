@@ -109,6 +109,7 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
               emailAddress: request.emailAddress,
               serviceType: request.serviceType,
               preferredParkingLocation: request.preferredParkingLocation,
+              requestedSlot: request.requestedSlot,
               requiredStartDate: request.requiredStartDate,
               endDate: request.endDate,
               purpose: request.purpose,
@@ -123,6 +124,7 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
             <Field label="Email Address" value={request.emailAddress} />
             <Field label="Service Type" value={request.serviceType} />
             <Field label="Preferred Location" value={request.preferredParkingLocation} />
+            <Field label="Requested Slot (requestor's preference)" value={request.requestedSlot} />
             <Field label="Date of Request" value={fmt(request.dateOfRequest)} />
             <Field label="Required Start" value={fmtParkingDate(request.requiredStartDate)} />
             <Field label="End" value={fmtParkingDate(request.endDate)} />
@@ -179,7 +181,7 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
         <div className="card">
           <h2 className="mb-4 text-lg font-semibold tracking-tight">Slot Track (WF05)</h2>
           <dl className="space-y-3">
-            <Field label="Assigned Slot" value={request.assignedSlot} />
+            <Field label="Assigned Slot (final)" value={request.assignedSlot} />
             <Field label="Slot Assignment Date" value={fmt(request.slotAssignmentDate)} />
             <Field label="Assigned By" value={request.assignedBy?.name} />
           </dl>

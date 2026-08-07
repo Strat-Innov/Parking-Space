@@ -91,6 +91,7 @@ export type SubmitRequestInput = {
   emailAddress: string;
   serviceType: ServiceType;
   preferredParkingLocation: string;
+  requestedSlot?: string;
   requiredStartDate: Date;
   endDate: Date;
   purpose: string;
@@ -145,6 +146,7 @@ export async function submitRequest(input: SubmitRequestInput, requesterId: stri
         emailAddress: input.emailAddress,
         serviceType: input.serviceType,
         preferredParkingLocation: input.preferredParkingLocation,
+        requestedSlot: input.requestedSlot || null,
         dateOfRequest,
         requiredStartDate: input.requiredStartDate,
         endDate: input.endDate,
@@ -199,6 +201,7 @@ export async function updateRequestDetails(requestId: string, actor: SessionPayl
         emailAddress: input.emailAddress,
         serviceType: input.serviceType,
         preferredParkingLocation: input.preferredParkingLocation,
+        requestedSlot: input.requestedSlot || null,
         requiredStartDate: input.requiredStartDate,
         endDate: input.endDate,
         purpose: input.purpose,

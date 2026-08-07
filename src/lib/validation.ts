@@ -10,6 +10,7 @@ export const intakeFieldsSchema = z.object({
   emailAddress: z.string().email(),
   serviceType: z.enum(SERVICE_TYPES),
   preferredParkingLocation: z.string().min(1),
+  requestedSlot: z.string().optional(),
   requiredStartDate: z.coerce.date(),
   endDate: z.coerce.date(),
   purpose: z.string().min(1),

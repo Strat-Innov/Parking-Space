@@ -46,7 +46,11 @@ model ParkingRequest {
   emailAddress              String
   serviceType                String // Hourly | Daily | Monthly
   preferredParkingLocation   String
-  dateOfRequest               DateTime @default(now()) // system-set (BR-001/002/003)
+  // Requestor's optional hint at a specific slot — NOT the real assignment.
+  // Parking Management still does the actual, authoritative assignment via
+  // WF05 (see assignedSlot below); this is just a preference to consider.
+  requestedSlot                String?
+  dateOfRequest                 DateTime @default(now()) // system-set (BR-001/002/003)
   requiredStartDate            DateTime
   endDate                        DateTime
   purpose                          String
