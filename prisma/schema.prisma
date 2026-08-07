@@ -1,0 +1,146 @@
+// Parking Space Request Automation — data model
+//
+// Fields intentionally use String instead of Prisma `enum` because the
+// project targets SQLite by default (see .env.example) and SQLite has no
+// native enum type. Allowed values are enforced in code (src/lib/types.ts)
+// via zod/TypeScript unions, not the database. Swapping DATABASE_URL to a
+// Postgres connection string works without a schema rewrite.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String // REQUESTER | PREPARED_BY | VALIDATED_BY | CASHIER | PARKING_MANAGEMENT
+  createdAt    DateTime @default(now())
+
+  requestsSubmitted ParkingRequest[] @relation("Requester")
+  requestsPrepared  ParkingRequest[] @relation("PreparedBy")
+  requestsValidated ParkingRequest[] @relation("ValidatedBy")
+  requestsRejected  ParkingRequest[] @relation("RejectedBy")
+  requestsCashiered ParkingRequest[] @relation("Cashier")
+  requestsAssigned  ParkingRequest[] @relation("AssignedBy")
+  rateTableEntries  RateTableEntry[] @relation("RateCreatedBy")
+  events            RequestEvent[]   @relation("EventActor")
+}
+
+model ParkingRequest {
+  id String @id @default(cuid())
+
+  // --- Section 5: intake fields ---
+  companyName              String
+  emailAddress              String
+  serviceType                String // Hourly | Daily | Monthly
+  preferredParkingLocation   String
+  dateOfRequest               DateTime @default(now()) // system-set (BR-001/002/003)
+  requiredStartDate            DateTime
+  endDate                        DateTime
+  purpose                          String
+
+  // --- Section 2: primary lifecycle (BR-008: never encodes ownership) ---
+  status String @default("Submitted")
+  // Submitted | In Preparation | Pending Approval | Approved | Completed | Cancelled
+
+  // --- Section 4: single-owner progression up to Approved, then Post-Approval ---
+  approvalStage String @default("Prepared By")
+  // Prepared By | Validated By | Post-Approval | Completed
+
+  // --- independent parallel tracks (BR-006) ---
+  paymentStatus String @default("Not Started") // Not Started | Pending | Confirmed
+  slotStatus    String @default("Unassigned") // Unassigned | Assigned
+
+  // WF02
+  preparedById String?
+  preparedBy   User?   @relation("PreparedBy", fields: [preparedById], references: [id])
+
+  // WF03
+  validatedById    String?
+  validatedBy      User?     @relation("ValidatedBy", fields: [validatedById], references: [id])
+  approvalDecision String? // Approved | Rejected (most recent decision)
+  validatedDate    DateTime?
+
+  // WF03 reject branch — audit (Section 8, BR-004)
+  rejectionCount  Int       @default(0)
+  rejectionReason String?
+  rejectedById    String?
+  rejectedBy      User?     @relation("RejectedBy", fields: [rejectedById], references: [id])
+  rejectedDate    DateTime?
+
+  // WF04
+  cashierId                String?
+  cashier                  User?     @relation("Cashier", fields: [cashierId], references: [id])
+  payDate                  DateTime?
+  officialReceiptReference String?
+
+  // WF05
+  assignedSlot       String?
+  slotAssignmentDate DateTime?
+  assignedById       String?
+  assignedBy         User?     @relation("AssignedBy", fields: [assignedById], references: [id])
+
+  // computed at submission, from requiredStartDate/endDate + serviceType
+  totalHours  Float?
+  totalDays   Float?
+  totalMonths Float?
+
+  // Section 7: rate integrity — snapshot at WF03 approval, never re-derived later
+  rateVersionId      String?
+  rateVersion        RateTableEntry? @relation(fields: [rateVersionId], references: [id])
+  rateAmountSnapshot Float?
+  rateSnapshotDate   DateTime?
+  totalPaymentDue    Float?
+
+  // WF06 — sole writer of Status = Completed
+  completedDate DateTime?
+
+  requesterId String
+  requester   User   @relation("Requester", fields: [requesterId], references: [id])
+
+  events RequestEvent[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Section 7 — append-only. Rows are never edited after creation; a rate
+// change is a new row with a new effectiveStartDate. "Current rate" is
+// resolved by querying the latest row with effectiveStartDate <= now,
+// never by mutating an older row's effectiveEndDate.
+model RateTableEntry {
+  id                 String    @id @default(cuid())
+  serviceType        String
+  chargingModel       String
+  rateAmount           Float
+  effectiveStartDate    DateTime
+  effectiveEndDate      DateTime? // reserved for display use only; see resolution note above
+  createdById            String
+  createdBy              User      @relation("RateCreatedBy", fields: [createdById], references: [id])
+  createdAt               DateTime  @default(now())
+
+  requests ParkingRequest[]
+}
+
+// Section 8 note: Microsoft Lists gives native per-item version history for
+// free; outside SharePoint that isn't automatic, so this table is the
+// explicit substitute — one append-only row per workflow transition.
+model RequestEvent {
+  id         String   @id @default(cuid())
+  requestId  String
+  request    ParkingRequest @relation(fields: [requestId], references: [id])
+  workflow   String // WF01..WF06
+  fromStatus String?
+  toStatus   String?
+  actorId    String?
+  actor      User?    @relation("EventActor", fields: [actorId], references: [id])
+  note       String?
+  createdAt  DateTime @default(now())
+}
