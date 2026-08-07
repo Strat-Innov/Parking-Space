@@ -9,6 +9,7 @@ import { handleApiError } from "@/lib/api-helpers";
 import { SERVICE_TYPES } from "@/lib/types";
 
 const createSchema = z.object({
+  fullName: z.string().min(1),
   companyName: z.string().min(1),
   emailAddress: z.string().email(),
   serviceType: z.enum(SERVICE_TYPES),
@@ -54,14 +55,14 @@ export async function GET() {
 // log back in as it, only to have submitted the request at all. This
 // mirrors BR-003/BR-004 — once submitted, the requester has no further
 // access, loop or otherwise.
-async function resolveGuestRequesterId(companyName: string, emailAddress: string) {
+async function resolveGuestRequesterId(fullName: string, emailAddress: string) {
   const email = emailAddress.toLowerCase();
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) return existing.id;
 
   const unusablePasswordHash = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 10);
   const created = await prisma.user.create({
-    data: { name: companyName, email, role: "REQUESTER", passwordHash: unusablePasswordHash },
+    data: { name: fullName, email, role: "REQUESTER", passwordHash: unusablePasswordHash },
   });
   return created.id;
 }
@@ -81,7 +82,7 @@ export async function POST(req: NextRequest) {
 
     const requesterId = session
       ? session.sub
-      : await resolveGuestRequesterId(parsed.data.companyName, parsed.data.emailAddress);
+      : await resolveGuestRequesterId(parsed.data.fullName, parsed.data.emailAddress);
 
     const created = await submitRequest(parsed.data, requesterId);
     return NextResponse.json({ request: created }, { status: 201 });

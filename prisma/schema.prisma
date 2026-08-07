@@ -38,6 +38,10 @@ model ParkingRequest {
   id String @id @default(cuid())
 
   // --- Section 5: intake fields ---
+  // fullName is a build-time addition beyond the original Section 5 field
+  // list — needed once submission went public (see /requests/new): a
+  // company name alone doesn't say who to actually contact.
+  fullName                 String
   companyName              String
   emailAddress              String
   serviceType                String // Hourly | Daily | Monthly

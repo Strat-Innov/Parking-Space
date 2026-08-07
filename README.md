@@ -78,6 +78,16 @@ can each act in any order — that independence is the whole point of BR-006.
   from any non-terminal state." This build allows the owning requester or
   any staff role to cancel, while a request is not yet `Completed` or
   `Cancelled`.
+- **Public submission + `Full Name`**: the doc assumed an authenticated
+  "Parker" submitting through Microsoft Lists (Section 5's field list has no
+  personal-name field, only Company Name). Once submission needed to be a
+  public, QR-code-reachable form for external companies with no account
+  (`/requests/new`), a `Full Name` field was added — Company Name alone
+  doesn't say who to actually contact. Anonymous submissions get a
+  lightweight "guest" `User` row (found-or-created by email) with an
+  unusable random password hash, purely to satisfy the `requesterId`
+  foreign key — never a real login-capable account, consistent with
+  BR-003's "requester loses all access on submission."
 
 ## Deploying to Vercel
 

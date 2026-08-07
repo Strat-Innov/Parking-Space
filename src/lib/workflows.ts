@@ -75,6 +75,7 @@ async function logEvent(
 // "Item created" as WF01's trigger in the architecture doc.
 
 export type SubmitRequestInput = {
+  fullName: string;
   companyName: string;
   emailAddress: string;
   serviceType: ServiceType;
@@ -103,6 +104,7 @@ export async function submitRequest(input: SubmitRequestInput, requesterId: stri
   return prisma.$transaction(async (tx) => {
     const created = await tx.parkingRequest.create({
       data: {
+        fullName: input.fullName,
         companyName: input.companyName,
         emailAddress: input.emailAddress,
         serviceType: input.serviceType,

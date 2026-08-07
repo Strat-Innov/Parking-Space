@@ -86,6 +86,7 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
       <div className="card">
         <h2 className="mb-4 text-lg font-semibold tracking-tight">Request Details</h2>
         <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+          <Field label="Full Name" value={request.fullName} />
           <Field label="Email Address" value={request.emailAddress} />
           <Field label="Service Type" value={request.serviceType} />
           <Field label="Preferred Location" value={request.preferredParkingLocation} />
