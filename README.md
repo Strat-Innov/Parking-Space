@@ -11,23 +11,27 @@ The source document was written against Microsoft Lists + Power Automate,
 but explicitly left the implementation platform open (Section 6: "a
 Microsoft Lists capability question, not an architecture question"). This
 build targets a standalone full-stack web app instead — Next.js
-(TypeScript, App Router) + Prisma + SQLite — so the whole thing runs with
-no external services.
+(TypeScript, App Router) + Prisma + Postgres.
 
 ## Stack
 
-- **Next.js 14** (App Router) — server components for pages, route handlers for the API
-- **Prisma + SQLite** — swap to Postgres by changing `DATABASE_URL` and the `datasource` provider in `prisma/schema.prisma` (fields are plain strings, not native enums, specifically so this swap doesn't require a schema rewrite)
+- **Next.js 16** (App Router) — server components for pages, route handlers for the API
+- **Prisma + Postgres** — fields are plain strings rather than native Prisma enums, validated in code (`src/lib/types.ts`) instead
 - **jose + bcryptjs** — signed httpOnly session cookies, hashed passwords (no third-party auth provider)
 - **zod** — request validation
 - **Tailwind CSS** — styling
 
 ## Getting started
 
+You need a Postgres database, even for local dev — get a free one from
+[Neon](https://neon.tech), [Supabase](https://supabase.com), or Vercel's
+Storage tab, or run one locally with Docker
+(`docker run -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres`).
+
 ```bash
 npm install
-cp .env.example .env        # edit SESSION_SECRET if you want a real one
-npm run db:push             # creates prisma/dev.db from schema.prisma
+cp .env.example .env        # set DATABASE_URL to your Postgres connection string, and SESSION_SECRET to a real random value
+npm run db:push             # creates tables from schema.prisma
 npm run db:seed             # seeds one demo user per role + starter rate table
 npm run dev
 ```
@@ -75,11 +79,13 @@ can each act in any order — that independence is the whole point of BR-006.
   any staff role to cancel, while a request is not yet `Completed` or
   `Cancelled`.
 
-## Moving to Postgres
+## Deploying to Vercel
 
-1. In `prisma/schema.prisma`, change `provider = "sqlite"` to `provider = "postgresql"`.
-2. Set `DATABASE_URL` to a Postgres connection string.
-3. Run `npx prisma db push` (or set up migrations with `npx prisma migrate dev`).
+1. **Storage tab → Create Database** (Postgres, Neon-backed) on your Vercel project, or connect an external Postgres (Neon/Supabase) — either way you end up with a connection string.
+2. **Settings → Environment Variables** on the Vercel project: add `DATABASE_URL` (that connection string) and `SESSION_SECRET` (any long random string — `openssl rand -base64 32`) for the Production environment. Redeploy after adding them (env var changes don't apply to an already-running deployment).
+3. From a machine with `npm`/Node, point a local `.env` at that same `DATABASE_URL` and run `npm run db:push && npm run db:seed` once, to create the tables and demo users in the production database. (Prisma connects directly over the network — this doesn't need to run inside Vercel.)
 
-No application code changes are required — the schema deliberately avoids
-SQLite-only constructs.
+Without step 2, every request that touches the database fails with a 500 —
+there's no `DATABASE_URL` for Prisma to connect to. Without step 3, login
+fails with "Internal server error" because the tables/users don't exist yet
+even though the connection itself works.

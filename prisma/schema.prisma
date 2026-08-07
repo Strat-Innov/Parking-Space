@@ -1,17 +1,18 @@
 // Parking Space Request Automation — data model
 //
-// Fields intentionally use String instead of Prisma `enum` because the
-// project targets SQLite by default (see .env.example) and SQLite has no
-// native enum type. Allowed values are enforced in code (src/lib/types.ts)
-// via zod/TypeScript unions, not the database. Swapping DATABASE_URL to a
-// Postgres connection string works without a schema rewrite.
+// Fields intentionally use String instead of Prisma `enum` — this schema
+// started on SQLite (no native enum support) and now targets Postgres for
+// real deployments (e.g. Vercel, whose serverless functions have no
+// writable persistent filesystem for a file-based SQLite database). Kept
+// as String/zod-validated (src/lib/types.ts) rather than switching to
+// Prisma enums so the datasource stays swappable without a schema rewrite.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
