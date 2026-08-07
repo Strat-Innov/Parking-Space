@@ -1,4 +1,5 @@
 import { Prisma, ParkingRequest } from "@prisma/client";
+import { startOfDay } from "date-fns";
 import { prisma } from "./prisma";
 import type { SessionPayload } from "./auth";
 import type { ServiceType } from "./types";
@@ -88,15 +89,22 @@ export type SubmitRequestInput = {
 export async function submitRequest(input: SubmitRequestInput, requesterId: string) {
   const dateOfRequest = new Date(); // system-set — BR-003, never taken from the client
 
-  // BR-001 (no backdating) + BR-002 (advance requests only, strict inequality)
-  if (input.requiredStartDate <= dateOfRequest) {
+  // BR-001 (no backdating) + BR-002 (advance requests only — "no same-day
+  // requests" is a CALENDAR-DAY rule, not just "later timestamp"). Now that
+  // Required Start Date/End Date carry a time-of-day, comparing raw
+  // timestamps would let someone book 5 minutes from now — still today.
+  // Compare start-of-day so BR-002 holds regardless of what time is picked.
+  if (startOfDay(input.requiredStartDate) <= startOfDay(dateOfRequest)) {
     throw new WorkflowError(
-      "Required Start Date must be strictly after the date of request (BR-001/BR-002 — no backdating, no same-day requests).",
+      "Required Start Date must be on a later calendar day than the date of request (BR-001/BR-002 — no backdating, no same-day requests).",
       422
     );
   }
-  if (input.endDate < input.requiredStartDate) {
-    throw new WorkflowError("End Date cannot be before Required Start Date.", 422);
+  // Strictly after, not just not-before: an End Date/Time equal to the
+  // start would silently bill a minimum 1-unit stay (see computeTotals'
+  // Math.max floor) instead of surfacing as the same nonsensical span it is.
+  if (input.endDate <= input.requiredStartDate) {
+    throw new WorkflowError("End Date/Time must be after Required Start Date/Time.", 422);
   }
 
   const totals = computeTotals(input.serviceType, input.requiredStartDate, input.endDate);

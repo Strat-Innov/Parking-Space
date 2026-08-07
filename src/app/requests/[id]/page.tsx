@@ -38,7 +38,6 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
   if (session.role === "REQUESTER" && request.requesterId !== session.sub) notFound();
 
   const fmt = (d: Date | null) => (d ? new Date(d).toLocaleString() : "—");
-  const fmtDate = (d: Date | null) => (d ? new Date(d).toLocaleDateString() : "—");
 
   return (
     <div className="space-y-6">
@@ -91,8 +90,8 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
           <Field label="Service Type" value={request.serviceType} />
           <Field label="Preferred Location" value={request.preferredParkingLocation} />
           <Field label="Date of Request" value={fmt(request.dateOfRequest)} />
-          <Field label="Required Start Date" value={fmtDate(request.requiredStartDate)} />
-          <Field label="End Date" value={fmtDate(request.endDate)} />
+          <Field label="Required Start" value={fmt(request.requiredStartDate)} />
+          <Field label="End" value={fmt(request.endDate)} />
           <Field label="Purpose" value={request.purpose} />
           <Field
             label="Computed Total"

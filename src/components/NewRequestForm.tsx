@@ -22,6 +22,15 @@ export default function NewRequestForm() {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
+  function updateRequiredStartDate(value: string) {
+    setForm((f) => {
+      // Clear a now-invalid End Date rather than silently submitting a
+      // start/end pair the server will reject anyway.
+      const endStillValid = f.endDate && value && new Date(f.endDate) > new Date(value);
+      return { ...f, requiredStartDate: value, endDate: endStillValid ? f.endDate : "" };
+    });
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -42,7 +51,26 @@ export default function NewRequestForm() {
     }
   }
 
-  const todayPlus1 = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  // datetime-local wants "YYYY-MM-DDTHH:mm" in LOCAL time, not the UTC
+  // string toISOString() gives — that would silently shift the min by the
+  // visitor's UTC offset.
+  function toDateTimeLocal(d: Date) {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  const tomorrowStart = new Date();
+  tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+  tomorrowStart.setHours(0, 0, 0, 0);
+  const minStartDateTime = toDateTimeLocal(tomorrowStart);
+
+  // End Date's minimum tracks whatever Start Date is currently picked (one
+  // minute after it, so the widget itself can't offer an equal-to-start,
+  // zero-duration option) — falls back to the same tomorrow floor before
+  // Start Date has a value.
+  const minEndDateTime = form.requiredStartDate
+    ? toDateTimeLocal(new Date(new Date(form.requiredStartDate).getTime() + 60_000))
+    : minStartDateTime;
 
   if (submittedId) {
     return (
@@ -95,16 +123,30 @@ export default function NewRequestForm() {
           <input required value={form.preferredParkingLocation} onChange={(e) => update("preferredParkingLocation", e.target.value)} />
         </div>
         <div className="field">
-          <label>Required Start Date</label>
-          <input type="date" required min={todayPlus1} value={form.requiredStartDate} onChange={(e) => update("requiredStartDate", e.target.value)} />
-          <p className="mt-1 text-xs text-slate-500">Must be after today (BR-001/BR-002 — no backdating, no same-day requests).</p>
+          <label>Required Start Date &amp; Time</label>
+          <input
+            type="datetime-local"
+            required
+            min={minStartDateTime}
+            value={form.requiredStartDate}
+            onChange={(e) => updateRequiredStartDate(e.target.value)}
+          />
+          <p className="mt-1 text-xs text-slate-500">Must be a later calendar day than today (BR-001/BR-002 — no backdating, no same-day requests).</p>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div className="field">
-          <label>End Date</label>
-          <input type="date" required value={form.endDate} onChange={(e) => update("endDate", e.target.value)} />
+          <label>End Date &amp; Time</label>
+          <input
+            type="datetime-local"
+            required
+            min={minEndDateTime}
+            disabled={!form.requiredStartDate}
+            value={form.endDate}
+            onChange={(e) => update("endDate", e.target.value)}
+          />
+          <p className="mt-1 text-xs text-slate-500">Must be after Required Start Date &amp; Time.</p>
         </div>
       </div>
 
