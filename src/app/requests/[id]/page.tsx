@@ -38,6 +38,11 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
   if (session.role === "REQUESTER" && request.requesterId !== session.sub) notFound();
 
   const fmt = (d: Date | null) => (d ? new Date(d).toLocaleString() : "—");
+  // Daily/Monthly store midnight as an implementation detail (see
+  // NewRequestForm) — showing "12:00:00 AM" would misleadingly suggest a
+  // real time was picked, so only Hourly requests show a time-of-day here.
+  const fmtParkingDate = (d: Date | null) =>
+    d ? (request.serviceType === "Hourly" ? new Date(d).toLocaleString() : new Date(d).toLocaleDateString()) : "—";
 
   return (
     <div className="space-y-6">
@@ -90,8 +95,8 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
           <Field label="Service Type" value={request.serviceType} />
           <Field label="Preferred Location" value={request.preferredParkingLocation} />
           <Field label="Date of Request" value={fmt(request.dateOfRequest)} />
-          <Field label="Required Start" value={fmt(request.requiredStartDate)} />
-          <Field label="End" value={fmt(request.endDate)} />
+          <Field label="Required Start" value={fmtParkingDate(request.requiredStartDate)} />
+          <Field label="End" value={fmtParkingDate(request.endDate)} />
           <Field label="Purpose" value={request.purpose} />
           <Field
             label="Computed Total"

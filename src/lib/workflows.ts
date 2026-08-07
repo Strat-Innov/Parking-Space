@@ -100,11 +100,22 @@ export async function submitRequest(input: SubmitRequestInput, requesterId: stri
       422
     );
   }
-  // Strictly after, not just not-before: an End Date/Time equal to the
-  // start would silently bill a minimum 1-unit stay (see computeTotals'
-  // Math.max floor) instead of surfacing as the same nonsensical span it is.
-  if (input.endDate <= input.requiredStartDate) {
-    throw new WorkflowError("End Date/Time must be after Required Start Date/Time.", 422);
+  // Hourly carries a real time-of-day, so End must be strictly after Start
+  // — equal would silently bill a minimum 1-hour stay (see computeTotals'
+  // Math.max floor) instead of surfacing as the zero-duration span it is.
+  // Daily/Monthly are date-only under the hood (both default to midnight),
+  // so End == Start is a legitimate same-day, 1-unit booking, not a bug.
+  const endMustBeStrictlyAfterStart = input.serviceType === "Hourly";
+  const invalidRange = endMustBeStrictlyAfterStart
+    ? input.endDate <= input.requiredStartDate
+    : input.endDate < input.requiredStartDate;
+  if (invalidRange) {
+    throw new WorkflowError(
+      endMustBeStrictlyAfterStart
+        ? "End Time must be after Start Time."
+        : "End Date cannot be before Required Start Date.",
+      422
+    );
   }
 
   const totals = computeTotals(input.serviceType, input.requiredStartDate, input.endDate);
