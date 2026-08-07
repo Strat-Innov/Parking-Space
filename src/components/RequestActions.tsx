@@ -75,22 +75,9 @@ export default function RequestActions({ request, role, userId }: { request: Req
 
   const panels: React.ReactNode[] = [];
 
-  // WF02 — Prepared By
-  if (role === "PREPARED_BY" && request.status === "In Preparation") {
-    panels.push(
-      <ActionShell
-        key="wf02"
-        title="Endorse for validation (WF02)"
-        loading={loading}
-        error={error}
-        submitLabel="Endorse for Validation"
-        onSubmit={(e) => {
-          e.preventDefault();
-          run(() => call(`/api/requests/${request.id}/prepare`));
-        }}
-      />
-    );
-  }
+  // WF02 — Prepared By: moved into RequestDetailsForm, next to Save
+  // Changes, since editing and endorsing apply to exactly the same window
+  // (Status = "In Preparation") and belong together.
 
   // WF03 — Validated By
   if (role === "VALIDATED_BY" && request.status === "Pending Approval") {

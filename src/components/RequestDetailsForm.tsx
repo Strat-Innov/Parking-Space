@@ -82,7 +82,8 @@ export default function RequestDetailsForm({
   const [saved, setSaved] = useState(false);
   const [form, setForm] = useState<FormState>(initial ? fromInitial(initial) : blankForm());
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [busyAction, setBusyAction] = useState<"save" | "endorse" | null>(null);
+  const loading = busyAction !== null;
 
   const isHourly = form.serviceType === "Hourly";
 
@@ -116,37 +117,15 @@ export default function RequestDetailsForm({
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    // Only the Prepared-By edit form needs a confirmation — a fresh public
+    // submission (mode="create") shouldn't get extra friction on top of
+    // the form itself.
+    if (mode === "edit" && !confirm("Save these changes to the request?")) return;
+
     setError(null);
-    setLoading(true);
+    setBusyAction("save");
     try {
-      // Hourly: independent Start/End times. Daily/Monthly: the single
-      // "Time" field is mirrored onto both ends (a real check-in time, not
-      // implicit midnight) so day/month boundaries — and later, overnight
-      // billing — can be computed from it rather than assumed.
-      const requiredStartDate = `${form.startDate}T${form.startTime}`;
-      const endDate = isHourly ? `${form.endDate}T${form.endTime}` : `${form.endDate}T${form.startTime}`;
-
-      const payload = {
-        fullName: form.fullName,
-        companyName: form.companyName,
-        emailAddress: form.emailAddress,
-        serviceType: form.serviceType,
-        preferredParkingLocation: form.preferredParkingLocation,
-        requestedSlot: form.requestedSlot || undefined,
-        requiredStartDate,
-        endDate,
-        purpose: form.purpose,
-      };
-
-      const url = mode === "create" ? "/api/requests" : `/api/requests/${requestId}/edit`;
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Submission failed");
-
+      const data = await saveDetails();
       if (mode === "create") {
         setSubmittedId(data.request.id);
       } else {
@@ -157,7 +136,61 @@ export default function RequestDetailsForm({
     } catch (err) {
       setError(err instanceof Error ? err.message : "Submission failed");
     } finally {
-      setLoading(false);
+      setBusyAction(null);
+    }
+  }
+
+  async function saveDetails() {
+    // Hourly: independent Start/End times. Daily/Monthly: the single
+    // "Time" field is mirrored onto both ends (a real check-in time, not
+    // implicit midnight) so day/month boundaries — and later, overnight
+    // billing — can be computed from it rather than assumed.
+    const requiredStartDate = `${form.startDate}T${form.startTime}`;
+    const endDate = isHourly ? `${form.endDate}T${form.endTime}` : `${form.endDate}T${form.startTime}`;
+
+    const payload = {
+      fullName: form.fullName,
+      companyName: form.companyName,
+      emailAddress: form.emailAddress,
+      serviceType: form.serviceType,
+      preferredParkingLocation: form.preferredParkingLocation,
+      requestedSlot: form.requestedSlot || undefined,
+      requiredStartDate,
+      endDate,
+      purpose: form.purpose,
+    };
+
+    const url = mode === "create" ? "/api/requests" : `/api/requests/${requestId}/edit`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? "Submission failed");
+    return data;
+  }
+
+  // WF02 — sits next to Save Changes rather than as a separate action card,
+  // since editing and endorsing both apply to exactly the same window
+  // (Prepared By, Status = "In Preparation").
+  async function onEndorse() {
+    if (!confirm("Endorse this request for validation? You won't be able to edit these details afterward.")) return;
+    setError(null);
+    setBusyAction("endorse");
+    try {
+      // Save whatever's currently in the form first, so an endorse never
+      // silently discards an edit still sitting in the fields.
+      await saveDetails();
+      const res = await fetch(`/api/requests/${requestId}/prepare`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Action failed");
+      router.refresh();
+      onSaved?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Action failed");
+    } finally {
+      setBusyAction(null);
     }
   }
 
@@ -315,9 +348,16 @@ export default function RequestDetailsForm({
       {error && <p className="text-sm text-red-600">{error}</p>}
       {saved && !error && <p className="text-sm text-emerald-600">Saved.</p>}
 
-      <button type="submit" disabled={loading} className="btn-primary">
-        {loading ? "Saving..." : mode === "create" ? "Submit Request" : "Save Changes"}
-      </button>
+      <div className="flex items-center gap-3">
+        <button type="submit" disabled={loading} className="btn-primary">
+          {busyAction === "save" ? "Saving..." : mode === "create" ? "Submit Request" : "Save Changes"}
+        </button>
+        {mode === "edit" && (
+          <button type="button" disabled={loading} onClick={onEndorse} className="btn-secondary">
+            {busyAction === "endorse" ? "Endorsing..." : "Endorse for Validation"}
+          </button>
+        )}
+      </div>
     </form>
   );
 }
