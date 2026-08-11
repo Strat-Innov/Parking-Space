@@ -40,7 +40,7 @@ Visit `http://localhost:3000`. Demo accounts (password for all: `demo1234`):
 
 | Role | Email |
 |---|---|
-| Requester | `requester@parking.local` |
+| Requestor | `requester@parking.local` |
 | Prepared By | `prepared@parking.local` |
 | Validated By | `validator@parking.local` |
 | Cashier | `cashier@parking.local` |
@@ -59,7 +59,7 @@ can each act in any order — that independence is the whole point of BR-006.
 | Section 3 — WF01–WF06 | `src/lib/workflows.ts` — one function per workflow, each the sole writer of its documented transition |
 | Section 4 — Approval Stage / `Current Owner` removal | `ApprovalStage` enum in `src/lib/types.ts`; no `currentOwner`/`currentAction` columns exist in `prisma/schema.prisma` |
 | Section 5 — Data model | `prisma/schema.prisma`, `ParkingRequest` model, field-by-field per the doc's disposition table |
-| Section 6 — Forms | `src/components/NewRequestForm.tsx` — one form for all Service Types, no per-type branching |
+| Section 6 — Forms | `src/components/RequestDetailsForm.tsx` — one shared form for all Service Types (used for both create and edit), no per-type branching |
 | Section 7 — Rate Table | `RateTableEntry` model (append-only) + `resolveCurrentRate()` in `src/lib/workflows.ts`, called from WF03 at the moment of approval |
 | Section 8 — Audit fields | Current-value fields live on `ParkingRequest`; the append-only `RequestEvent` table is this build's substitute for Microsoft Lists' native version history (which isn't automatic outside SharePoint) |
 | Section 9 — BR-001..BR-008 | Enforced in `src/lib/workflows.ts` and role checks in `src/app/api/**/route.ts`; see inline comments referencing each BR |
