@@ -2,25 +2,13 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { isActionable } from "@/lib/dashboard";
 import StatusBadge from "@/components/StatusBadge";
+import OtherRequestsPanel from "@/components/OtherRequestsPanel";
 import { ROLE_LABELS, type Role } from "@/lib/types";
 import type { ParkingRequest } from "@prisma/client";
 
 type Row = ParkingRequest & { requester: { name: string } };
-
-function isActionable(role: Role, r: Pick<ParkingRequest, "status" | "paymentStatus" | "slotStatus">) {
-  switch (role) {
-    case "PREPARED_BY":
-      // WF02 (prepare/endorse) and WF04 (confirm payment) both land here now.
-      return r.status === "In Preparation" || (r.status === "Approved" && r.paymentStatus !== "Confirmed");
-    case "VALIDATED_BY":
-      return r.status === "Pending Approval";
-    case "PARKING_MANAGEMENT":
-      return r.status === "Approved" && r.slotStatus !== "Assigned";
-    default:
-      return false;
-  }
-}
 
 function RequestsTable({ requests, emptyLabel }: { requests: Row[]; emptyLabel: string }) {
   return (
@@ -92,6 +80,17 @@ export default async function DashboardPage() {
   const actionable = requests.filter((r) => isActionable(role, r));
   const rest = requests.filter((r) => !isActionable(role, r));
 
+  const otherRows = rest.map((r) => ({
+    id: r.id,
+    companyName: r.companyName,
+    serviceType: r.serviceType,
+    status: r.status,
+    approvalStage: r.approvalStage,
+    paymentStatus: r.paymentStatus,
+    slotStatus: r.slotStatus,
+    requiredStartDate: r.requiredStartDate.toISOString(),
+  }));
+
   return (
     <div>
       <div className="mb-6">
@@ -111,7 +110,7 @@ export default async function DashboardPage() {
 
       <div>
         <h2 className="mb-3 text-lg font-semibold tracking-tight">Other Requests</h2>
-        <RequestsTable requests={rest} emptyLabel="No other requests." />
+        <OtherRequestsPanel rows={otherRows} />
       </div>
     </div>
   );
