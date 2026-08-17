@@ -39,7 +39,7 @@ export default function RateTableForm() {
   return (
     <form onSubmit={onSubmit} className="card space-y-4">
       <h3 className="font-medium">Add new rate version</h3>
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-slate-500 dark:text-slate-400">
         Append-only (Section 7): this always creates a new row. Existing rows are never edited — the current rate for a
         service type is resolved as the most recent row whose effective start date has passed.
       </p>
@@ -71,7 +71,7 @@ export default function RateTableForm() {
           onChange={(e) => setForm((f) => ({ ...f, effectiveStartDate: e.target.value }))}
         />
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       <button type="submit" disabled={loading} className="btn-primary">
         {loading ? "Saving..." : "Add Rate Version"}
       </button>

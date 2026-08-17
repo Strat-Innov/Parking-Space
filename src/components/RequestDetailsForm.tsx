@@ -252,13 +252,15 @@ export default function RequestDetailsForm({
     return (
       <div className="card space-y-3 text-center">
         <h2 className="text-lg font-semibold tracking-tight">Request submitted</h2>
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-slate-600 dark:text-slate-300">
           Thanks, {form.fullName} — your parking request for <strong>{form.companyName}</strong> has been received and is now in review.
         </p>
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-slate-400 dark:text-slate-500">
           Reference: <span className="font-mono">{submittedId}</span>
         </p>
-        <p className="text-xs text-slate-500">Keep this reference for your records. You&apos;ll be contacted at {form.emailAddress}.</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Keep this reference for your records. You&apos;ll be contacted at {form.emailAddress}.
+        </p>
       </div>
     );
   }
@@ -307,7 +309,7 @@ export default function RequestDetailsForm({
               {locations.length > 0 && (
                 <button
                   type="button"
-                  className="text-xs text-slate-500 underline"
+                  className="text-xs text-slate-500 underline dark:text-slate-400"
                   onClick={() => {
                     setLocationMode("select");
                     update("preferredParkingLocation", "");
@@ -363,7 +365,7 @@ export default function RequestDetailsForm({
             onChange={(e) => updateStartDate(e.target.value)}
             className="flex-1"
           />
-          <span className="text-slate-400">—</span>
+          <span className="text-slate-400 dark:text-slate-500">—</span>
           <input
             type="date"
             required
@@ -374,7 +376,7 @@ export default function RequestDetailsForm({
             className="flex-1"
           />
         </div>
-        <p className="mt-1 text-xs text-slate-500">
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
           {form.serviceType === "Monthly"
             ? "Start must be a later calendar day than today, and End at least 1 month after Start (BR-001/BR-002)."
             : "Start must be a later calendar day than today (BR-001/BR-002 — no backdating, no same-day requests)."}
@@ -393,7 +395,7 @@ export default function RequestDetailsForm({
               onChange={(e) => update("startTime", e.target.value)}
               className="flex-1"
             />
-            <span className="text-slate-400">—</span>
+            <span className="text-slate-400 dark:text-slate-500">—</span>
             <input
               type="time"
               required
@@ -404,7 +406,7 @@ export default function RequestDetailsForm({
               className="flex-1"
             />
           </div>
-          <p className="mt-1 text-xs text-slate-500">End Time must be after Start Time on the same day.</p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">End Time must be after Start Time on the same day.</p>
         </div>
       ) : (
         <div className="field">
@@ -417,7 +419,7 @@ export default function RequestDetailsForm({
             onChange={(e) => update("startTime", e.target.value)}
             className="w-40"
           />
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
             Check-in time — applied to both the start and end date, so the parking period is a real 24-hour cycle from this time
             rather than midnight.
           </p>
@@ -429,8 +431,8 @@ export default function RequestDetailsForm({
         <textarea required rows={3} value={form.purpose} onChange={(e) => update("purpose", e.target.value)} />
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      {saved && !error && <p className="text-sm text-emerald-600">Saved.</p>}
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {saved && !error && <p className="text-sm text-emerald-600 dark:text-emerald-400">Saved.</p>}
 
       <div className="flex items-center gap-3">
         {(mode === "create" || isDirty) && (

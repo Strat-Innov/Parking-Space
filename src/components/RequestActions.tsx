@@ -45,7 +45,7 @@ function ActionShell({
     <form onSubmit={onSubmit} className="card space-y-3">
       <h3 className="font-medium">{title}</h3>
       {children}
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       <button type="submit" disabled={loading} className={danger ? "btn-danger" : "btn-primary"}>
         {loading ? "Working..." : submitLabel}
       </button>
@@ -137,7 +137,7 @@ export default function RequestActions({
       panels.push(
         <div key="wf05" className="card space-y-2">
           <h3 className="font-medium">Assign parking slot (WF05)</h3>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
             No parking spaces are free for this request&apos;s dates. Add one, or wait for one to free up, on the{" "}
             <a href="/parking-locations" className="underline">
               Parking Location

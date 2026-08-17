@@ -69,7 +69,12 @@ function LocationModal({
       >
         <div className="mb-4 flex items-start justify-between">
           <h2 className="text-lg font-semibold tracking-tight">{location}</h2>
-          <button type="button" onClick={onClose} aria-label="Close" className="text-slate-400 hover:text-slate-700">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-200"
+          >
             ✕
           </button>
         </div>
@@ -80,7 +85,7 @@ function LocationModal({
             <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="e.g. A-01" />
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-medium text-slate-500">Filter by current booking:</span>
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Filter by current booking:</span>
             {FILTERS.map((f) => (
               <button
                 key={f}
@@ -88,8 +93,8 @@ function LocationModal({
                 onClick={() => setServiceFilter(f)}
                 className={`rounded-full px-3 py-1 text-xs font-medium ${
                   serviceFilter === f
-                    ? "bg-slate-900 text-white"
-                    : "border border-slate-300 bg-white text-slate-600 hover:bg-slate-100"
+                    ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
+                    : "border border-slate-300 bg-white text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800"
                 }`}
               >
                 {f}
@@ -99,11 +104,11 @@ function LocationModal({
         </div>
 
         <div className="space-y-2">
-          {filtered.length === 0 && <p className="text-sm text-slate-400">No slots match.</p>}
+          {filtered.length === 0 && <p className="text-sm text-slate-400 dark:text-slate-500">No slots match.</p>}
           {filtered.map((s) => (
             <div
               key={s.id}
-              className={`flex flex-wrap items-center gap-4 rounded-lg border border-slate-200 px-3 py-2 text-sm ${
+              className={`flex flex-wrap items-center gap-4 rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-800 ${
                 !s.isActive ? "opacity-50" : ""
               }`}
             >
@@ -111,7 +116,7 @@ function LocationModal({
                 <span className="font-mono font-medium">{s.slotNumber}</span>
                 <StatusBadge value={!s.isActive ? "Removed" : s.isLockedNow ? "Occupied now" : "Available"} />
               </div>
-              <div className="flex-1 text-right text-xs text-slate-500">
+              <div className="flex-1 text-right text-xs text-slate-500 dark:text-slate-400">
                 {!s.isActive
                   ? "Removed from inventory"
                   : s.currentBooking
@@ -125,7 +130,7 @@ function LocationModal({
                   type="button"
                   disabled={busyId === s.id}
                   onClick={() => onRemove(s.id)}
-                  className="text-xs font-medium text-red-600 underline hover:text-red-800"
+                  className="text-xs font-medium text-red-600 underline hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
                 >
                   {busyId === s.id ? "Removing..." : "Remove"}
                 </button>
@@ -191,7 +196,7 @@ export default function ParkingSpaceList({ rows, canMaintain }: { rows: ParkingS
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="e.g. Axis, Festival, Bloc 10..." />
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       <div>
         <h2 className="mb-2 text-lg font-semibold tracking-tight">Parking Locations</h2>
@@ -209,7 +214,7 @@ export default function ParkingSpaceList({ rows, canMaintain }: { rows: ParkingS
             <tbody>
               {locations.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-slate-400">
+                  <td colSpan={5} className="py-8 text-center text-slate-400 dark:text-slate-500">
                     No matching locations.
                   </td>
                 </tr>
@@ -224,7 +229,7 @@ export default function ParkingSpaceList({ rows, canMaintain }: { rows: ParkingS
                     <button
                       type="button"
                       onClick={() => setOpenLocation(l.location)}
-                      className="text-sm font-medium text-slate-700 underline hover:text-slate-900"
+                      className="text-sm font-medium text-slate-700 underline hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100"
                     >
                       View Slots
                     </button>

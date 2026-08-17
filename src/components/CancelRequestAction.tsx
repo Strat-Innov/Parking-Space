@@ -39,7 +39,7 @@ export default function CancelRequestAction({ requestId, status, role }: { reque
   return (
     <form onSubmit={onSubmit} className="card space-y-3">
       <h3 className="font-medium">Cancel request</h3>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       <button type="submit" disabled={loading} className="btn-danger">
         {loading ? "Working..." : "Cancel Request"}
       </button>

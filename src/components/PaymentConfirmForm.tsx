@@ -49,7 +49,7 @@ export default function PaymentConfirmForm({ requestId }: { requestId: string })
         <label>Pay Date</label>
         <input type="date" required value={payDate} onChange={(e) => setPayDate(e.target.value)} />
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       <button type="submit" disabled={loading} className="btn-primary">
         {loading ? "Saving..." : "Confirm Payment"}
       </button>

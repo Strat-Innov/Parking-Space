@@ -41,7 +41,7 @@ function RequestsTable({ requests, emptyLabel }: { requests: Row[]; emptyLabel: 
         <tbody>
           {requests.length === 0 && (
             <tr>
-              <td colSpan={8} className="py-8 text-center text-slate-400">
+              <td colSpan={8} className="py-8 text-center text-slate-400 dark:text-slate-500">
                 {emptyLabel}
               </td>
             </tr>
@@ -64,7 +64,10 @@ function RequestsTable({ requests, emptyLabel }: { requests: Row[]; emptyLabel: 
               </td>
               <td>{new Date(r.requiredStartDate).toLocaleDateString()}</td>
               <td>
-                <Link href={`/requests/${r.id}`} className="text-sm font-medium text-slate-700 underline hover:text-slate-900">
+                <Link
+                  href={`/requests/${r.id}`}
+                  className="text-sm font-medium text-slate-700 underline hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100"
+                >
                   Open
                 </Link>
               </td>
@@ -93,7 +96,7 @@ export default async function DashboardPage() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-slate-500">{ROLE_LABELS[role]} queue</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">{ROLE_LABELS[role]} queue</p>
       </div>
 
       <div className="mb-8">

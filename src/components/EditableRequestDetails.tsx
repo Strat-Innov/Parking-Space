@@ -36,7 +36,11 @@ export default function EditableRequestDetails({
     <div>
       <div className="mb-2 flex items-center justify-between">
         <h2 className="text-lg font-semibold tracking-tight">Request Details</h2>
-        <button type="button" onClick={() => setEditing(false)} className="text-sm text-slate-500 underline hover:text-slate-900">
+        <button
+          type="button"
+          onClick={() => setEditing(false)}
+          className="text-sm text-slate-500 underline hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+        >
           Cancel
         </button>
       </div>

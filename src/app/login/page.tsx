@@ -40,7 +40,7 @@ export default function LoginPage() {
   return (
     <div className="mx-auto max-w-md">
       <h1 className="mb-1 text-2xl font-semibold tracking-tight">Parking Space</h1>
-      <p className="mb-6 text-sm text-slate-500">Parking Space Request Automation — sign in</p>
+      <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">Parking Space Request Automation — sign in</p>
 
       <form onSubmit={onSubmit} className="card space-y-4">
         <div className="field">
@@ -51,18 +51,22 @@ export default function LoginPage() {
           <label>Password</label>
           <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
         </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         <button type="submit" disabled={loading} className="btn-primary w-full">
           {loading ? "Signing in..." : "Sign in"}
         </button>
       </form>
 
-      <div className="mt-6 text-xs text-slate-500">
-        <p className="mb-2 font-medium text-slate-600">Demo accounts (password: demo1234)</p>
+      <div className="mt-6 text-xs text-slate-500 dark:text-slate-400">
+        <p className="mb-2 font-medium text-slate-600 dark:text-slate-300">Demo accounts (password: demo1234)</p>
         <ul className="space-y-1">
           {DEMO_ACCOUNTS.map((a) => (
             <li key={a.email}>
-              <button type="button" className="underline hover:text-slate-900" onClick={() => setEmail(a.email)}>
+              <button
+                type="button"
+                className="underline hover:text-slate-900 dark:hover:text-slate-100"
+                onClick={() => setEmail(a.email)}
+              >
                 {a.label}
               </button>{" "}
               — {a.email}

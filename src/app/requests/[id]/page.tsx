@@ -13,8 +13,8 @@ import type { Role } from "@/lib/types";
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
-      <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</dt>
-      <dd className="text-sm text-slate-800">{value ?? "—"}</dd>
+      <dt className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">{label}</dt>
+      <dd className="text-sm text-slate-800 dark:text-slate-200">{value ?? "—"}</dd>
     </div>
   );
 }
@@ -77,9 +77,9 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-xs font-mono text-slate-400">{request.id}</p>
+        <p className="text-xs font-mono text-slate-400 dark:text-slate-500">{request.id}</p>
         <h1 className="text-2xl font-semibold tracking-tight">{request.companyName}</h1>
-        <p className="text-sm text-slate-500">Submitted by {request.requester.name}</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Submitted by {request.requester.name}</p>
       </div>
 
       {/* BR-008: Status and Approval Stage are never merged; Payment/Slot are
@@ -87,19 +87,19 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
       <div className="card">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400">Status</p>
+            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">Status</p>
             <StatusBadge value={request.status} />
           </div>
           <div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400">Approval Stage</p>
+            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">Approval Stage</p>
             <StatusBadge value={request.approvalStage} />
           </div>
           <div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400">Payment Status</p>
+            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">Payment Status</p>
             <StatusBadge value={request.paymentStatus} />
           </div>
           <div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400">Slot Status</p>
+            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">Slot Status</p>
             <StatusBadge value={request.slotStatus} />
           </div>
         </div>
@@ -199,7 +199,7 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
           {canConfirmPayment ? (
             <PaymentConfirmForm requestId={request.id} />
           ) : (
-            <dl className="space-y-3 border-t border-slate-100 pt-4">
+            <dl className="space-y-3 border-t border-slate-100 pt-4 dark:border-slate-800">
               <Field label="Confirmed By" value={request.cashier?.name} />
               <Field label="Pay Date" value={fmt(request.payDate)} />
               <Field label="Official Receipt Reference" value={request.officialReceiptReference} />

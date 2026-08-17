@@ -21,7 +21,7 @@ export default async function RateTablePage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Rate Table</h1>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-slate-500 dark:text-slate-400">
           Append-only reference list. WF03 snapshots the effective rate onto a request at the moment of approval.
         </p>
       </div>
@@ -43,7 +43,7 @@ export default async function RateTablePage() {
           <tbody>
             {entries.length === 0 && (
               <tr>
-                <td colSpan={6} className="py-8 text-center text-slate-400">
+                <td colSpan={6} className="py-8 text-center text-slate-400 dark:text-slate-500">
                   No rate versions configured yet.
                 </td>
               </tr>
@@ -55,7 +55,7 @@ export default async function RateTablePage() {
                 <td>{e.rateAmount.toFixed(2)}</td>
                 <td>{new Date(e.effectiveStartDate).toLocaleDateString()}</td>
                 <td>{e.createdBy.name}</td>
-                <td className="font-mono text-xs text-slate-400">{e.id}</td>
+                <td className="font-mono text-xs text-slate-400 dark:text-slate-500">{e.id}</td>
               </tr>
             ))}
           </tbody>
