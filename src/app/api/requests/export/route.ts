@@ -1,12 +1,10 @@
-import { createElement, type ReactElement } from "react";
 import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
-import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import { requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isActionable } from "@/lib/dashboard";
 import { handleApiError } from "@/lib/api-helpers";
-import ParkingRequestFormDocument, { type PdfRequestData } from "@/lib/pdf/ParkingRequestFormDocument";
+import { buildFillableForm, type PdfRequestData } from "@/lib/pdf/buildFillableForm";
 import { STATUSES, SERVICE_TYPES, type Role } from "@/lib/types";
 
 // Two modes, picked by whether `id` is present:
@@ -118,22 +116,20 @@ export async function GET(req: NextRequest) {
       validatedByName: r.validatedBy?.name ?? null,
     }));
 
-    // renderToBuffer's types expect a <Document> element directly; our
-    // component returns exactly that, but TS can't see through the
-    // function-component boundary to verify it — safe to assert.
     try {
-      const pdfElement = createElement(ParkingRequestFormDocument, { requests: pdfData }) as unknown as ReactElement<DocumentProps>;
-      const buffer = await renderToBuffer(pdfElement);
-      return new NextResponse(new Uint8Array(buffer), {
+      const bytes = await buildFillableForm(pdfData);
+      return new NextResponse(new Uint8Array(bytes), {
         headers: {
           "Content-Type": "application/pdf",
           "Content-Disposition": `attachment; filename="${filenameBase}.pdf"`,
         },
       });
     } catch (pdfErr) {
-      // Temporary — surfaces the real cause instead of a generic 500 while
-      // this is being debugged in production. Narrow scope (this route
-      // only), not sensitive (render-library error text, no secrets).
+      // Keeps surfacing the real cause instead of a generic 500 — this bit
+      // us once already with a library that failed only once deployed
+      // (@react-pdf/renderer, since replaced by pdf-lib below). Narrow
+      // scope (this route only), not sensitive (render error text, no
+      // secrets).
       console.error("PDF export failed:", pdfErr);
       const message = pdfErr instanceof Error ? `${pdfErr.name}: ${pdfErr.message}` : String(pdfErr);
       return NextResponse.json({ error: `PDF generation failed: ${message}` }, { status: 500 });

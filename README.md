@@ -69,21 +69,32 @@ the public form and its guest account (see below), consistent with BR-003.
 
 ### Design decisions not fully pinned by the doc
 
-- **Dashboard export** (`GET /api/requests/export`, build-time addition —
-  not in the doc): the "Other Requests" table can be searched (by company)
-  and filtered (Status, Service Type) client-side, then exported as CSV,
-  XLSX (`exceljs`), or PDF (`@react-pdf/renderer`) — the export always
-  re-queries the DB server-side with the same role scoping and filters
-  rather than trusting rows already in the browser. The PDF specifically
-  replicates the original paper "PARKING SPACE REQUEST FORM"
-  (PPI.SOF002_Rev.1) this system automates — one page per request, same
-  section layout and field labels — adapted where our data model doesn't
-  carry a 1:1 equivalent: no Contact Number field exists in this build, the
-  form's "Slot/s" charging column is relabeled "Month/s" to match this
-  system's actual Hourly/Daily/Monthly service types instead of the
-  original's separate concept, and the old "PPISOF.PC-####" numbering is
-  replaced by the request's real `id` plus a generated-on timestamp (see
-  `src/lib/pdf/ParkingRequestFormDocument.tsx`).
+- **Export** (`GET /api/requests/export`, build-time addition — not in the
+  doc): every request detail page has its own PDF/CSV/XLSX download
+  (no role/isActionable/filter scoping — if you can see the page, you can
+  export it); the dashboard's "Other Requests" table additionally supports
+  search (by company) and filters (Status, Service Type) client-side, with
+  the same three export formats scoped to whatever's currently filtered.
+  Either way the export always re-queries the DB server-side rather than
+  trusting rows already in the browser. CSV is hand-rolled, XLSX uses
+  `exceljs` (kept as a `serverExternalPackages` entry in `next.config.js` —
+  see below).
+- **PDF export is a real fillable form** (`src/lib/pdf/buildFillableForm.ts`,
+  `pdf-lib`), not flattened/static text — every value sits in an actual
+  AcroForm text field, editable afterward in any PDF viewer. It replicates
+  the original paper "PARKING SPACE REQUEST FORM" (PPI.SOF002_Rev.1) this
+  system automates — one page per request, same section layout and field
+  labels — adapted where our data model doesn't carry a 1:1 equivalent: no
+  Contact Number field exists in this build, the form's "Slot/s" charging
+  column is relabeled "Month/s" to match this system's actual
+  Hourly/Daily/Monthly service types instead of the original's separate
+  concept, and the old "PPISOF.PC-####" numbering is replaced by the
+  request's real `id` plus a generated-on timestamp. This replaced an
+  earlier `@react-pdf/renderer` attempt that rendered correctly locally but
+  500'd once deployed to Vercel (its dependency tree — a pdfkit fork,
+  fontkit, a separate layout/reconciler — didn't reliably survive being
+  bundled for a serverless function) — `pdf-lib` is a single small package
+  with no such issue.
 - **WF04 owner is Prepared By, not Cashier** — this one actively overrides
   the doc's Section 3 table (`WF04 Owner: Cashier`), a deliberate later
   decision rather than a gap the doc left open. There's no more standalone
