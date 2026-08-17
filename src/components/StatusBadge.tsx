@@ -16,6 +16,10 @@ const COLORS: Record<string, string> = {
   Confirmed: "bg-emerald-100 text-emerald-800",
   Unassigned: "bg-slate-100 text-slate-600",
   Assigned: "bg-emerald-100 text-emerald-800",
+  // Parking Location inventory
+  Available: "bg-emerald-100 text-emerald-800",
+  "Occupied now": "bg-amber-100 text-amber-800",
+  Removed: "bg-red-100 text-red-700",
 };
 
 export default function StatusBadge({ value }: { value: string }) {

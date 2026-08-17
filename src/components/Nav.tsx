@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ROLE_LABELS, type Role } from "@/lib/types";
 
+// Same roles as Rate Table maintenance access (Section 7) — the roles that
+// actually touch slot assignment or the requests feeding it.
+const PARKING_LOCATION_ROLES: Role[] = ["PARKING_MANAGEMENT", "PREPARED_BY", "VALIDATED_BY"];
+
 export default function Nav({ name, role }: { name: string; role: Role }) {
   const router = useRouter();
 
@@ -26,6 +30,11 @@ export default function Nav({ name, role }: { name: string; role: Role }) {
           <Link href="/rate-table" className="text-slate-600 hover:text-slate-900">
             Rate Table
           </Link>
+          {PARKING_LOCATION_ROLES.includes(role) && (
+            <Link href="/parking-locations" className="text-slate-600 hover:text-slate-900">
+              Parking Location
+            </Link>
+          )}
           <span className="text-slate-400">|</span>
           <span className="text-slate-600">
             {name} <span className="text-slate-400">({ROLE_LABELS[role]})</span>

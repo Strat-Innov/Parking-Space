@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { findLockedSpaceIds } from "@/lib/workflows";
 import StatusBadge from "@/components/StatusBadge";
 import Timeline from "@/components/Timeline";
 import RequestActions from "@/components/RequestActions";
@@ -36,6 +37,20 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
   });
 
   if (!request) notFound();
+
+  // Only fetched for the role that can actually act on WF05 — everyone else
+  // never needs the inventory query.
+  let availableSpaces: { id: string; location: string; slotNumber: string }[] = [];
+  if (session.role === "PARKING_MANAGEMENT" && request.status === "Approved" && request.slotStatus !== "Assigned") {
+    const [spaces, lockedIds] = await Promise.all([
+      prisma.parkingSpace.findMany({
+        where: { isActive: true },
+        orderBy: [{ location: "asc" }, { slotNumber: "asc" }],
+      }),
+      findLockedSpaceIds(request.requiredStartDate, request.endDate, request.id),
+    ]);
+    availableSpaces = spaces.filter((s) => !lockedIds.has(s.id));
+  }
 
   // Prepared By can correct the requestor's submitted details while it's
   // still theirs to prepare — not a BR-003 violation, that rule revokes the
@@ -91,7 +106,9 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
           status: request.status,
           paymentStatus: request.paymentStatus,
           slotStatus: request.slotStatus,
+          preferredParkingLocation: request.preferredParkingLocation,
         }}
+        availableSpaces={availableSpaces}
         role={session.role as Role}
         userId={session.sub}
       />

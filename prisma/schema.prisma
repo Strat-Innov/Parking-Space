@@ -31,6 +31,7 @@ model User {
   requestsCashiered ParkingRequest[] @relation("Cashier")
   requestsAssigned  ParkingRequest[] @relation("AssignedBy")
   rateTableEntries  RateTableEntry[] @relation("RateCreatedBy")
+  parkingSpaces     ParkingSpace[]   @relation("ParkingSpaceCreatedBy")
   events            RequestEvent[]   @relation("EventActor")
 }
 
@@ -90,8 +91,12 @@ model ParkingRequest {
   payDate                  DateTime?
   officialReceiptReference String?
 
-  // WF05
+  // WF05 — assignedSlot is a human-readable snapshot ("<location> — <slot>")
+  // kept for display/audit even if the ParkingSpace row is later removed;
+  // parkingSpaceId is the real FK used for date-range availability checks.
   assignedSlot       String?
+  parkingSpaceId     String?
+  parkingSpace       ParkingSpace? @relation(fields: [parkingSpaceId], references: [id])
   slotAssignmentDate DateTime?
   assignedById       String?
   assignedBy         User?     @relation("AssignedBy", fields: [assignedById], references: [id])
@@ -134,6 +139,26 @@ model RateTableEntry {
   createdById            String
   createdBy              User      @relation("RateCreatedBy", fields: [createdById], references: [id])
   createdAt               DateTime  @default(now())
+
+  requests ParkingRequest[]
+}
+
+// Parking Location inventory — unlike the append-only Rate Table, this list
+// is mutable: a physical space can be added or removed outright. Removal is
+// soft (isActive = false, never hard-deleted) so past assignments keep a
+// valid parkingSpaceId to point at. "Assigned or not" is deliberately NOT a
+// static column here — a space is only unavailable for the specific date
+// range it's actually booked, derived by checking ParkingRequest rows with
+// a matching parkingSpaceId and an overlapping [requiredStartDate, endDate]
+// (see isSpaceAvailable in workflows.ts), not a permanent flag on the space.
+model ParkingSpace {
+  id          String   @id @default(cuid())
+  location    String
+  slotNumber  String
+  isActive    Boolean  @default(true)
+  createdById String
+  createdBy   User     @relation("ParkingSpaceCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
 
   requests ParkingRequest[]
 }

@@ -10,7 +10,10 @@ type RequestShape = {
   status: string;
   paymentStatus: string;
   slotStatus: string;
+  preferredParkingLocation: string;
 };
+
+type AvailableSpace = { id: string; location: string; slotNumber: string };
 
 async function call(url: string, body?: unknown) {
   const res = await fetch(url, {
@@ -52,13 +55,23 @@ function ActionShell({
   );
 }
 
-export default function RequestActions({ request, role, userId }: { request: RequestShape; role: Role; userId: string }) {
+export default function RequestActions({
+  request,
+  role,
+  userId,
+  availableSpaces = [],
+}: {
+  request: RequestShape;
+  role: Role;
+  userId: string;
+  availableSpaces?: AvailableSpace[];
+}) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [receiptRef, setReceiptRef] = useState("");
-  const [slot, setSlot] = useState("");
+  const [parkingSpaceId, setParkingSpaceId] = useState("");
 
   async function run(fn: () => Promise<unknown>) {
     setError(null);
@@ -153,26 +166,72 @@ export default function RequestActions({ request, role, userId }: { request: Req
     }
   }
 
-  // WF05 — Parking Management (independent track, BR-006)
+  // WF05 — Parking Management (independent track, BR-006). Only spaces free
+  // for this request's exact date range are offered (see availableSpaces in
+  // requests/[id]/page.tsx) — an already-booked space for an overlapping
+  // period simply isn't a choice here, rather than a validation error after
+  // the fact.
   if (role === "PARKING_MANAGEMENT" && request.status === "Approved" && request.slotStatus !== "Assigned") {
-    panels.push(
-      <ActionShell
-        key="wf05"
-        title="Assign parking slot (WF05)"
-        loading={loading}
-        error={error}
-        submitLabel="Assign Slot"
-        onSubmit={(e) => {
-          e.preventDefault();
-          run(() => call(`/api/requests/${request.id}/slot`, { assignedSlot: slot }));
-        }}
-      >
-        <div className="field">
-          <label>Slot / space number</label>
-          <input required value={slot} onChange={(e) => setSlot(e.target.value)} placeholder="e.g. B-14" />
+    if (availableSpaces.length === 0) {
+      panels.push(
+        <div key="wf05" className="card space-y-2">
+          <h3 className="font-medium">Assign parking slot (WF05)</h3>
+          <p className="text-sm text-slate-500">
+            No parking spaces are free for this request&apos;s dates. Add one, or wait for one to free up, on the{" "}
+            <a href="/parking-locations" className="underline">
+              Parking Location
+            </a>{" "}
+            page.
+          </p>
         </div>
-      </ActionShell>
-    );
+      );
+    } else {
+      const preferred = request.preferredParkingLocation.trim().toLowerCase();
+      const matches = availableSpaces.filter(
+        (s) => preferred && (s.location.toLowerCase().includes(preferred) || preferred.includes(s.location.toLowerCase()))
+      );
+      const others = availableSpaces.filter((s) => !matches.includes(s));
+
+      panels.push(
+        <ActionShell
+          key="wf05"
+          title="Assign parking slot (WF05)"
+          loading={loading}
+          error={error}
+          submitLabel="Assign Slot"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!parkingSpaceId) return;
+            run(() => call(`/api/requests/${request.id}/slot`, { parkingSpaceId }));
+          }}
+        >
+          <div className="field">
+            <label>Parking space</label>
+            <select required value={parkingSpaceId} onChange={(e) => setParkingSpaceId(e.target.value)}>
+              <option value="" disabled>
+                Select a space...
+              </option>
+              {matches.length > 0 && (
+                <optgroup label={`Convenient — matches "${request.preferredParkingLocation}"`}>
+                  {matches.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.location} — {s.slotNumber}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              <optgroup label={matches.length > 0 ? "Other available spaces" : "Available spaces"}>
+                {others.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.location} — {s.slotNumber}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+          </div>
+        </ActionShell>
+      );
+    }
   }
 
   // Cancel — any non-terminal state, any staff role other than Prepared By

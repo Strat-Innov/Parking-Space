@@ -72,6 +72,22 @@ guest account (see below), consistent with BR-003.
 - **BR-006 independence** is enforced structurally: `wf04ConfirmPayment` and
   `wf05AssignSlot` each only read/write their own track and then hand off to
   `wf06CheckCompletion` — neither ever reads the other's status directly.
+- **Parking Location inventory** (`ParkingSpace` model, `/parking-locations`,
+  build-time addition — not in the doc): the doc's `Assigned Slot` field was
+  originally just free text typed in at WF05. It's now backed by a real
+  space inventory that Prepared By, Validated By, and Parking Management can
+  add to or remove from (unlike the Rate Table, this list isn't
+  append-only — removal is a soft `isActive` flag, blocked only while a
+  space has a current or upcoming booking, so past assignments keep a valid
+  reference). "Assigned or not" is deliberately not a static column on a
+  space; availability is derived per request by checking for any other
+  non-cancelled booking whose date range overlaps the request being
+  assigned (`findLockedSpaceIds` in `src/lib/workflows.ts`), so a space is
+  only locked for the exact period it's actually booked. WF05's UI now
+  offers only the spaces free for that request's dates, grouped so ones
+  matching the requestor's `Preferred Parking Location` sort first —
+  Parking Management can still pick a different available space for
+  convenience if the exact preference is booked.
 - **Rate Table append-only integrity**: rather than closing out an old row's
   `effectiveEndDate` on insert (which would technically be an edit to an
   existing row), "current rate" is resolved as the newest row whose

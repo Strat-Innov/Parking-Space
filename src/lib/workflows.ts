@@ -360,20 +360,70 @@ export async function wf04ConfirmPayment(requestId: string, actor: SessionPayloa
 
 // --- WF05 — Slot Assignment (independent track, BR-006) ---------------------------
 
-export async function wf05AssignSlot(requestId: string, actor: SessionPayload, assignedSlot: string) {
+// A space is unavailable only for the specific window it's actually booked
+// (Cancelled requests never held it; excludeRequestId lets a request check
+// against every OTHER booking without tripping over its own row).
+async function findConflictingBooking(
+  tx: Tx,
+  parkingSpaceId: string,
+  start: Date,
+  end: Date,
+  excludeRequestId?: string
+) {
+  return tx.parkingRequest.findFirst({
+    where: {
+      parkingSpaceId,
+      slotStatus: "Assigned",
+      status: { not: "Cancelled" },
+      ...(excludeRequestId ? { id: { not: excludeRequestId } } : {}),
+      requiredStartDate: { lt: end },
+      endDate: { gt: start },
+    },
+  });
+}
+
+// Used outside a transaction (e.g. to build a dropdown of choices) — returns
+// the set of ParkingSpace ids already booked over [start, end].
+export async function findLockedSpaceIds(start: Date, end: Date, excludeRequestId?: string) {
+  const bookings = await prisma.parkingRequest.findMany({
+    where: {
+      parkingSpaceId: { not: null },
+      slotStatus: "Assigned",
+      status: { not: "Cancelled" },
+      ...(excludeRequestId ? { id: { not: excludeRequestId } } : {}),
+      requiredStartDate: { lt: end },
+      endDate: { gt: start },
+    },
+    select: { parkingSpaceId: true },
+  });
+  return new Set(bookings.map((b) => b.parkingSpaceId as string));
+}
+
+export async function wf05AssignSlot(requestId: string, actor: SessionPayload, parkingSpaceId: string) {
   if (actor.role !== "PARKING_MANAGEMENT") throw new WorkflowError("Only Parking Management can assign a slot.", 403);
-  if (!assignedSlot?.trim()) throw new WorkflowError("A slot/space number is required.", 422);
+  if (!parkingSpaceId?.trim()) throw new WorkflowError("A parking space is required.", 422);
 
   return prisma.$transaction(async (tx) => {
     const req = await tx.parkingRequest.findUniqueOrThrow({ where: { id: requestId } });
     if (req.status !== "Approved") throw new WorkflowError('WF05 requires Status = "Approved".', 409);
     if (req.slotStatus === "Assigned") throw new WorkflowError("A slot is already assigned.", 409);
 
+    const space = await tx.parkingSpace.findUnique({ where: { id: parkingSpaceId } });
+    if (!space || !space.isActive) throw new WorkflowError("That parking space isn't available.", 404);
+
+    const conflict = await findConflictingBooking(tx, parkingSpaceId, req.requiredStartDate, req.endDate, requestId);
+    if (conflict) {
+      throw new WorkflowError("That parking space is already booked for an overlapping period.", 409);
+    }
+
+    const assignedSlot = `${space.location} — ${space.slotNumber}`;
+
     await tx.parkingRequest.update({
       where: { id: requestId },
       data: {
         slotStatus: "Assigned",
         assignedSlot,
+        parkingSpaceId,
         slotAssignmentDate: new Date(),
         assignedById: actor.sub,
       },

@@ -55,6 +55,19 @@ async function main() {
     });
   }
 
+  const existingSpaces = await prisma.parkingSpace.count();
+  if (existingSpaces === 0) {
+    await prisma.parkingSpace.createMany({
+      data: [
+        { location: "Axis Basement Parking", slotNumber: "A-01", createdById: managerId },
+        { location: "Axis Basement Parking", slotNumber: "A-02", createdById: managerId },
+        { location: "Axis Basement Parking", slotNumber: "A-03", createdById: managerId },
+        { location: "Axis Rooftop Parking", slotNumber: "R-01", createdById: managerId },
+        { location: "Axis Rooftop Parking", slotNumber: "R-02", createdById: managerId },
+      ],
+    });
+  }
+
   console.log("Seeded demo users (password for all: %s):", DEMO_PASSWORD);
   for (const u of USERS) console.log(`  ${u.role.padEnd(20)} ${u.email}`);
 }

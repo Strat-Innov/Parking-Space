@@ -4,7 +4,7 @@ import { requireSession } from "@/lib/auth";
 import { wf05AssignSlot } from "@/lib/workflows";
 import { handleApiError } from "@/lib/api-helpers";
 
-const schema = z.object({ assignedSlot: z.string().min(1) });
+const schema = z.object({ parkingSpaceId: z.string().min(1) });
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -13,9 +13,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const body = await req.json().catch(() => null);
     const parsed = schema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: "assignedSlot is required." }, { status: 422 });
+      return NextResponse.json({ error: "parkingSpaceId is required." }, { status: 422 });
     }
-    const updated = await wf05AssignSlot(id, session, parsed.data.assignedSlot);
+    const updated = await wf05AssignSlot(id, session, parsed.data.parkingSpaceId);
     return NextResponse.json({ request: updated });
   } catch (err) {
     return handleApiError(err);
