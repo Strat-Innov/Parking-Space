@@ -7,11 +7,7 @@ import type { Role } from "@/lib/types";
 type RequestShape = {
   id: string;
   status: string;
-  slotStatus: string;
-  preferredParkingLocation: string;
 };
-
-type AvailableSpace = { id: string; location: string; slotNumber: string };
 
 async function call(url: string, body?: unknown) {
   const res = await fetch(url, {
@@ -53,20 +49,11 @@ function ActionShell({
   );
 }
 
-export default function RequestActions({
-  request,
-  role,
-  availableSpaces = [],
-}: {
-  request: RequestShape;
-  role: Role;
-  availableSpaces?: AvailableSpace[];
-}) {
+export default function RequestActions({ request, role }: { request: RequestShape; role: Role }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
-  const [parkingSpaceId, setParkingSpaceId] = useState("");
 
   async function run(fn: () => Promise<unknown>) {
     setError(null);
@@ -127,73 +114,9 @@ export default function RequestActions({
   // (see PaymentConfirmForm in requests/[id]/page.tsx), not here — it's a
   // field edit, not a standalone action.
 
-  // WF05 — Parking Management (independent track, BR-006). Only spaces free
-  // for this request's exact date range are offered (see availableSpaces in
-  // requests/[id]/page.tsx) — an already-booked space for an overlapping
-  // period simply isn't a choice here, rather than a validation error after
-  // the fact.
-  if (role === "PARKING_MANAGEMENT" && request.status === "Approved" && request.slotStatus !== "Assigned") {
-    if (availableSpaces.length === 0) {
-      panels.push(
-        <div key="wf05" className="card space-y-2">
-          <h3 className="font-medium">Assign parking slot (WF05)</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            No parking spaces are free for this request&apos;s dates. Add one, or wait for one to free up, on the{" "}
-            <a href="/parking-locations" className="underline">
-              Parking Location
-            </a>{" "}
-            page.
-          </p>
-        </div>
-      );
-    } else {
-      const preferred = request.preferredParkingLocation.trim().toLowerCase();
-      const matches = availableSpaces.filter(
-        (s) => preferred && (s.location.toLowerCase().includes(preferred) || preferred.includes(s.location.toLowerCase()))
-      );
-      const others = availableSpaces.filter((s) => !matches.includes(s));
-
-      panels.push(
-        <ActionShell
-          key="wf05"
-          title="Assign parking slot (WF05)"
-          loading={loading}
-          error={error}
-          submitLabel="Assign Slot"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!parkingSpaceId) return;
-            run(() => call(`/api/requests/${request.id}/slot`, { parkingSpaceId }));
-          }}
-        >
-          <div className="field">
-            <label>Parking space</label>
-            <select required value={parkingSpaceId} onChange={(e) => setParkingSpaceId(e.target.value)}>
-              <option value="" disabled>
-                Select a space...
-              </option>
-              {matches.length > 0 && (
-                <optgroup label={`Convenient — matches "${request.preferredParkingLocation}"`}>
-                  {matches.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.location} — {s.slotNumber}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-              <optgroup label={matches.length > 0 ? "Other available spaces" : "Available spaces"}>
-                {others.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.location} — {s.slotNumber}
-                  </option>
-                ))}
-              </optgroup>
-            </select>
-          </div>
-        </ActionShell>
-      );
-    }
-  }
+  // WF05 — Parking Management confirms the slot inline on the Slot Track
+  // card (see SlotAssignForm in requests/[id]/page.tsx), same treatment as
+  // WF04 above, not here.
 
   // Cancel — moved to CancelRequestAction, rendered at the very bottom of
   // the page instead of grouped with these stage-specific panels.

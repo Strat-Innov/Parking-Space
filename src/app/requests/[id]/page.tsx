@@ -7,6 +7,7 @@ import Timeline from "@/components/Timeline";
 import RequestActions from "@/components/RequestActions";
 import EditableRequestDetails from "@/components/EditableRequestDetails";
 import PaymentConfirmForm from "@/components/PaymentConfirmForm";
+import SlotAssignForm from "@/components/SlotAssignForm";
 import CancelRequestAction from "@/components/CancelRequestAction";
 import type { Role } from "@/lib/types";
 
@@ -40,10 +41,14 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
 
   if (!request) notFound();
 
-  // Only fetched for the role that can actually act on WF05 — everyone else
+  // WF05, owned by Parking Management — a plain field edit on the Slot
+  // Track card rather than a separate action panel (see SlotAssignForm).
+  // Only fetched for the role that can actually act on it — everyone else
   // never needs the inventory query.
+  const canAssignSlot =
+    session.role === "PARKING_MANAGEMENT" && request.status === "Approved" && request.slotStatus !== "Assigned";
   let availableSpaces: { id: string; location: string; slotNumber: string }[] = [];
-  if (session.role === "PARKING_MANAGEMENT" && request.status === "Approved" && request.slotStatus !== "Assigned") {
+  if (canAssignSlot) {
     const [spaces, lockedIds] = await Promise.all([
       prisma.parkingSpace.findMany({
         where: { isActive: true },
@@ -105,16 +110,7 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
         </div>
       </div>
 
-      <RequestActions
-        request={{
-          id: request.id,
-          status: request.status,
-          slotStatus: request.slotStatus,
-          preferredParkingLocation: request.preferredParkingLocation,
-        }}
-        availableSpaces={availableSpaces}
-        role={session.role as Role}
-      />
+      <RequestActions request={{ id: request.id, status: request.status }} role={session.role as Role} />
 
       {(() => {
         const readOnlyDetails = (
@@ -208,11 +204,19 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
         </div>
         <div className="card">
           <h2 className="mb-4 text-lg font-semibold tracking-tight">Slot Track (WF05)</h2>
-          <dl className="space-y-3">
-            <Field label="Assigned Slot (final)" value={request.assignedSlot} />
-            <Field label="Slot Assignment Date" value={fmt(request.slotAssignmentDate)} />
-            <Field label="Assigned By" value={request.assignedBy?.name} />
-          </dl>
+          {canAssignSlot ? (
+            <SlotAssignForm
+              requestId={request.id}
+              preferredParkingLocation={request.preferredParkingLocation}
+              availableSpaces={availableSpaces}
+            />
+          ) : (
+            <dl className="space-y-3">
+              <Field label="Assigned Slot (final)" value={request.assignedSlot} />
+              <Field label="Slot Assignment Date" value={fmt(request.slotAssignmentDate)} />
+              <Field label="Assigned By" value={request.assignedBy?.name} />
+            </dl>
+          )}
         </div>
       </div>
 
