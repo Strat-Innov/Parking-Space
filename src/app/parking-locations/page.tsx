@@ -16,33 +16,59 @@ export default async function ParkingLocationsPage() {
     include: { createdBy: { select: { name: true } } },
   });
 
-  // "Occupied now" reflects this instant only — a space is locked for
-  // whichever date range it's actually booked (see findLockedSpaceIds in
-  // workflows.ts, used when Parking Management picks a space for a specific
-  // request), not permanently once ever assigned.
+  // One query for every booking that could still matter (still running or
+  // yet to start) — bucketed per space in memory below rather than a
+  // per-space query, so this stays one round trip regardless of inventory
+  // size. A space is only ever locked for the exact date range it's
+  // actually booked, never permanently.
   const now = new Date();
-  const currentBookings = await prisma.parkingRequest.findMany({
+  const relevantBookings = await prisma.parkingRequest.findMany({
     where: {
       parkingSpaceId: { not: null },
       slotStatus: "Assigned",
       status: { not: "Cancelled" },
-      requiredStartDate: { lte: now },
       endDate: { gte: now },
     },
-    select: { parkingSpaceId: true },
+    select: {
+      parkingSpaceId: true,
+      companyName: true,
+      serviceType: true,
+      requiredStartDate: true,
+      endDate: true,
+    },
+    orderBy: { requiredStartDate: "asc" },
   });
-  const lockedNow = new Set(currentBookings.map((b) => b.parkingSpaceId));
+
+  const bookingsBySpace = new Map<string, typeof relevantBookings>();
+  for (const b of relevantBookings) {
+    const key = b.parkingSpaceId as string;
+    const list = bookingsBySpace.get(key);
+    if (list) list.push(b);
+    else bookingsBySpace.set(key, [b]);
+  }
 
   const canMaintain = MAINTAINERS.includes(session.role as Role);
 
-  const rows = spaces.map((s) => ({
-    id: s.id,
-    location: s.location,
-    slotNumber: s.slotNumber,
-    isActive: s.isActive,
-    isLockedNow: lockedNow.has(s.id),
-    createdByName: s.createdBy.name,
-  }));
+  const rows = spaces.map((s) => {
+    const bookings = bookingsBySpace.get(s.id) ?? [];
+    const current = bookings.find((b) => b.requiredStartDate <= now && b.endDate >= now);
+    const next = !current ? bookings.find((b) => b.requiredStartDate > now) : undefined;
+
+    return {
+      id: s.id,
+      location: s.location,
+      slotNumber: s.slotNumber,
+      isActive: s.isActive,
+      isLockedNow: !!current,
+      currentBooking: current
+        ? { company: current.companyName, serviceType: current.serviceType, until: current.endDate.toISOString() }
+        : null,
+      nextBooking: next
+        ? { company: next.companyName, serviceType: next.serviceType, from: next.requiredStartDate.toISOString() }
+        : null,
+      createdByName: s.createdBy.name,
+    };
+  });
 
   return (
     <div className="space-y-6">
