@@ -6,6 +6,8 @@ import StatusBadge from "@/components/StatusBadge";
 import { ROLE_LABELS, type Role } from "@/lib/types";
 import type { ParkingRequest } from "@prisma/client";
 
+type Row = ParkingRequest & { requester: { name: string } };
+
 function isActionable(role: Role, r: Pick<ParkingRequest, "status" | "paymentStatus" | "slotStatus">) {
   switch (role) {
     case "PREPARED_BY":
@@ -21,6 +23,60 @@ function isActionable(role: Role, r: Pick<ParkingRequest, "status" | "paymentSta
   }
 }
 
+function RequestsTable({ requests, emptyLabel }: { requests: Row[]; emptyLabel: string }) {
+  return (
+    <div className="card table-wrap overflow-x-auto p-0">
+      <table>
+        <thead>
+          <tr>
+            <th>Company</th>
+            <th>Service</th>
+            <th>Status</th>
+            <th>Approval Stage</th>
+            <th>Payment</th>
+            <th>Slot</th>
+            <th>Required Start</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {requests.length === 0 && (
+            <tr>
+              <td colSpan={8} className="py-8 text-center text-slate-400">
+                {emptyLabel}
+              </td>
+            </tr>
+          )}
+          {requests.map((r) => (
+            <tr key={r.id}>
+              <td>{r.companyName}</td>
+              <td>{r.serviceType}</td>
+              <td>
+                <StatusBadge value={r.status} />
+              </td>
+              <td>
+                <StatusBadge value={r.approvalStage} />
+              </td>
+              <td>
+                <StatusBadge value={r.paymentStatus} />
+              </td>
+              <td>
+                <StatusBadge value={r.slotStatus} />
+              </td>
+              <td>{new Date(r.requiredStartDate).toLocaleDateString()}</td>
+              <td>
+                <Link href={`/requests/${r.id}`} className="text-sm font-medium text-slate-700 underline hover:text-slate-900">
+                  Open
+                </Link>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default async function DashboardPage() {
   const session = await getSession();
   if (!session) redirect("/login");
@@ -31,71 +87,29 @@ export default async function DashboardPage() {
     include: { requester: { select: { name: true } } },
   });
 
-  const sorted = [...requests].sort((a, b) => Number(isActionable(role, b)) - Number(isActionable(role, a)));
-  const actionableCount = requests.filter((r) => isActionable(role, r)).length;
+  const actionable = requests.filter((r) => isActionable(role, r));
+  const rest = requests.filter((r) => !isActionable(role, r));
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-          <p className="text-sm text-slate-500">
-            {ROLE_LABELS[role]} queue
-            {actionableCount > 0 && (
-              <span className="ml-2 rounded-full bg-slate-900 px-2 py-0.5 text-xs text-white">{actionableCount} need action</span>
-            )}
-          </p>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+        <p className="text-sm text-slate-500">{ROLE_LABELS[role]} queue</p>
       </div>
 
-      <div className="card table-wrap overflow-x-auto p-0">
-        <table>
-          <thead>
-            <tr>
-              <th>Company</th>
-              <th>Service</th>
-              <th>Status</th>
-              <th>Approval Stage</th>
-              <th>Payment</th>
-              <th>Slot</th>
-              <th>Required Start</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.length === 0 && (
-              <tr>
-                <td colSpan={8} className="py-8 text-center text-slate-400">
-                  No requests yet.
-                </td>
-              </tr>
-            )}
-            {sorted.map((r) => (
-              <tr key={r.id} className={isActionable(role, r) ? "bg-amber-50/50" : ""}>
-                <td>{r.companyName}</td>
-                <td>{r.serviceType}</td>
-                <td>
-                  <StatusBadge value={r.status} />
-                </td>
-                <td>
-                  <StatusBadge value={r.approvalStage} />
-                </td>
-                <td>
-                  <StatusBadge value={r.paymentStatus} />
-                </td>
-                <td>
-                  <StatusBadge value={r.slotStatus} />
-                </td>
-                <td>{new Date(r.requiredStartDate).toLocaleDateString()}</td>
-                <td>
-                  <Link href={`/requests/${r.id}`} className="text-sm font-medium text-slate-700 underline hover:text-slate-900">
-                    Open
-                  </Link>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="mb-8">
+        <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold tracking-tight">
+          Needs Your Action
+          {actionable.length > 0 && (
+            <span className="rounded-full bg-slate-900 px-2 py-0.5 text-xs text-white">{actionable.length}</span>
+          )}
+        </h2>
+        <RequestsTable requests={actionable} emptyLabel="Nothing needs your action right now." />
+      </div>
+
+      <div>
+        <h2 className="mb-3 text-lg font-semibold tracking-tight">Other Requests</h2>
+        <RequestsTable requests={rest} emptyLabel="No other requests." />
       </div>
     </div>
   );
