@@ -1,20 +1,20 @@
-import RequestDetailsForm from "@/components/RequestDetailsForm";
+import AccessRequestForm from "@/components/AccessRequestForm";
 import RequestTypeLinks from "@/components/RequestTypeLinks";
 import { getSession } from "@/lib/auth";
 import { ROLE_LABELS, type Role } from "@/lib/types";
 
-// Public — this is the page a QR code points at. External companies fill
-// this out with no account and no login; see /api/requests POST for how an
-// anonymous submission still gets a requesterId under the hood.
-export default async function NewRequestPage() {
+// Public — same pattern as /requests/new (a QR-code-reachable form, no
+// login). See /api/access-requests POST for how an anonymous submission
+// still gets a requesterId under the hood.
+export default async function NewAccessRequestPage() {
   const session = await getSession();
 
   return (
     <div className="mx-auto max-w-2xl">
-      <RequestTypeLinks current="space" />
-      <h1 className="mb-1 text-2xl font-semibold tracking-tight">New Parking Request</h1>
+      <RequestTypeLinks current="access" />
+      <h1 className="mb-1 text-2xl font-semibold tracking-tight">Enrollment for Parking Access</h1>
       <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">
-        Date of Request is set automatically on submission (BR-003) — you can&apos;t back-date or edit it.
+        RFID Sticker / Card / Metal Tag enrollment. Date of Request is set automatically on submission.
       </p>
       {session ? (
         <div className="card mb-6 border-amber-300 bg-amber-50 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
@@ -23,7 +23,7 @@ export default async function NewRequestPage() {
           submit as a guest requestor.
         </div>
       ) : (
-        <RequestDetailsForm mode="create" />
+        <AccessRequestForm />
       )}
     </div>
   );

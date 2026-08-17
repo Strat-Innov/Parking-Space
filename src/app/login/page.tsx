@@ -9,8 +9,11 @@ const DEMO_ACCOUNTS = [
   { label: "Parking Management", email: "parkingmgmt@parking.local" },
 ];
 
+type System = "space" | "access";
+
 export default function LoginPage() {
   const router = useRouter();
+  const [system, setSystem] = useState<System>("space");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("demo1234");
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +31,9 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Login failed");
-      router.push("/dashboard");
+      // Same staff accounts work both systems — this only picks which
+      // dashboard you land on first, not a separate permission set.
+      router.push(system === "access" ? "/access/dashboard" : "/dashboard");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
@@ -40,7 +45,33 @@ export default function LoginPage() {
   return (
     <div className="mx-auto max-w-md">
       <h1 className="mb-1 text-2xl font-semibold tracking-tight">Parking Space</h1>
-      <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">Parking Space Request Automation — sign in</p>
+      <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">Parking Space Request Automation — sign in</p>
+
+      <div className="field mb-6">
+        <label>System</label>
+        <div className="inline-flex items-center gap-0.5 rounded-lg border border-slate-300 p-0.5 dark:border-slate-700">
+          {(
+            [
+              { value: "space", label: "Parking Space" },
+              { value: "access", label: "Parking Access (RFID/Card/Metal Tag)" },
+            ] as const
+          ).map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => setSystem(o.value)}
+              aria-pressed={system === o.value}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                system === o.value
+                  ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
+                  : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+              }`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <form onSubmit={onSubmit} className="card space-y-4">
         <div className="field">

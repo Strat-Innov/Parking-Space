@@ -1,19 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession, requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { submitRequest } from "@/lib/workflows";
+import { submitAccessRequest } from "@/lib/access-workflows";
 import { handleApiError } from "@/lib/api-helpers";
-import { intakeFieldsSchema } from "@/lib/validation";
+import { accessIntakeFieldsSchema } from "@/lib/access-validation";
 import { resolveGuestRequesterId } from "@/lib/guest";
 
-// Every login-capable role (Prepared By, Validated By, Cashier, Parking
-// Management) sees every request — only their dashboard's actionable
-// filtering differs. Requestors never log in, so there's no self-scoped view.
+// Every login-capable role sees every access request — same pattern as
+// GET /api/requests, only the access dashboard's actionable filtering
+// (Parking Management only) differs.
 export async function GET() {
   try {
     await requireSession();
-
-    const requests = await prisma.parkingRequest.findMany({
+    const requests = await prisma.accessRequest.findMany({
       orderBy: { createdAt: "desc" },
       include: { requester: { select: { name: true, email: true } } },
     });
@@ -23,6 +22,8 @@ export async function GET() {
   }
 }
 
+// /access/new is public, same as /requests/new — no logged-in account can
+// submit through this route either.
 export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
@@ -34,14 +35,13 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => null);
-    const parsed = intakeFieldsSchema.safeParse(body);
+    const parsed = accessIntakeFieldsSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues.map((i) => i.message).join("; ") }, { status: 422 });
     }
 
     const requesterId = await resolveGuestRequesterId(parsed.data.fullName, parsed.data.emailAddress);
-
-    const created = await submitRequest(parsed.data, requesterId);
+    const created = await submitAccessRequest(parsed.data, requesterId);
     return NextResponse.json({ request: created }, { status: 201 });
   } catch (err) {
     return handleApiError(err);

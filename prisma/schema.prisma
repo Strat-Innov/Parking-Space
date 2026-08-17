@@ -33,6 +33,12 @@ model User {
   rateTableEntries  RateTableEntry[] @relation("RateCreatedBy")
   parkingSpaces     ParkingSpace[]   @relation("ParkingSpaceCreatedBy")
   events            RequestEvent[]   @relation("EventActor")
+
+  accessRequestsSubmitted  AccessRequest[]      @relation("AccessRequester")
+  accessRequestsProcessed  AccessRequest[]      @relation("AccessProcessedBy")
+  accessRequestsCompleted  AccessRequest[]      @relation("AccessCompletedBy")
+  accessRequestsCancelled  AccessRequest[]      @relation("AccessCancelledBy")
+  accessEvents             AccessRequestEvent[] @relation("AccessEventActor")
 }
 
 model ParkingRequest {
@@ -175,6 +181,91 @@ model RequestEvent {
   toStatus   String?
   actorId    String?
   actor      User?    @relation("EventActor", fields: [actorId], references: [id])
+  note       String?
+  createdAt  DateTime @default(now())
+}
+
+// --- Parking Access (RFID/Card/Metal Tag enrollment) --------------------
+//
+// A second, parallel request type — same login-capable roles as Parking
+// Space (Prepared By, Validated By, Parking Management; the system
+// selector at login just picks which dashboard you land on, not a
+// separate permission set), but a distinct data model and a deliberately
+// simpler, single-track lifecycle, since the paper process it replicates
+// ("Enrollment for Parking ACCESS", PPI Form2_Rev4_7) has no fork-join
+// structure like Parking Space's BR-006 payment/slot tracks: Submitted ->
+// Processed (Parking Management validates/endorses and logs the actual
+// access series + charge in one step, mirroring the form's single
+// combined "Validation of Document & Access Endorsement" box) ->
+// Completed (Parking Management confirms the client received it) or
+// Cancelled from either non-terminal state.
+model AccessRequest {
+  id String @id @default(cuid())
+
+  // --- intake ---
+  enrollmentType String // Individual | Corporate
+  requestType    String // New Enrollment | Replacement | Deactivation/Cancellation | Renewal | Reactivation | Transfer
+  transferTo     String? // only meaningful when requestType = Transfer
+  transferFrom   String?
+
+  fullName           String
+  companyName        String
+  emailAddress       String
+  vehiclePlateNumber String
+  propertyLocation   String
+  contactNumber      String
+  dateOfRequest      DateTime @default(now()) // system-set, same BR-003 spirit as Parking Space
+  requestedQuantity  Int
+  accessType         String // RFID Sticker/Card/Metal Tag | Manual Pass
+  remarks            String?
+  // The form's "APPROVED BY: Requestor's Authorized Approver Only" line —
+  // someone at the CLIENT company, not our staff. Captured as plain text
+  // only (no login exists for external companies), not a workflow gate.
+  approverName       String?
+
+  status String @default("Submitted") // Submitted | Processed | Completed | Cancelled
+
+  // Combined validation/endorsement + access issuance, one staff action
+  // (Parking Management) matching the form's single combined box.
+  processedById      String?
+  processedBy        User?     @relation("AccessProcessedBy", fields: [processedById], references: [id])
+  processedDate      DateTime?
+  confirmedQuantity  Int?
+  accessSeriesRef    String?
+  purchasedCharge    Float?
+  officialReceiptRef String?
+  staffRemarks       String?
+
+  // "The client hereby received the number of requested parking access in
+  // good order" — recorded by staff, since the client has no login to
+  // confirm this themselves.
+  receivedByName String?
+  completedById  String?
+  completedBy    User?     @relation("AccessCompletedBy", fields: [completedById], references: [id])
+  completedDate  DateTime?
+
+  cancelledById String?
+  cancelledBy   User?     @relation("AccessCancelledBy", fields: [cancelledById], references: [id])
+  cancelledDate DateTime?
+
+  requesterId String
+  requester   User   @relation("AccessRequester", fields: [requesterId], references: [id])
+
+  events AccessRequestEvent[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AccessRequestEvent {
+  id         String        @id @default(cuid())
+  requestId  String
+  request    AccessRequest @relation(fields: [requestId], references: [id])
+  workflow   String // AWF01 Submit | AWF02 Process | AWF03 Complete | Cancel
+  fromStatus String?
+  toStatus   String?
+  actorId    String?
+  actor      User?    @relation("AccessEventActor", fields: [actorId], references: [id])
   note       String?
   createdAt  DateTime @default(now())
 }

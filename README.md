@@ -54,6 +54,11 @@ Cashier note below for why payment confirmation moved to Prepared By).
 Requestors never log in; submission and status are handled entirely through
 the public form and its guest account (see below), consistent with BR-003.
 
+These same accounts also work the parallel **Parking Access** (RFID/Card/Metal
+Tag enrollment) system — see below — the "System" selector on the login
+page just picks which dashboard you land on first, it's not a separate
+login.
+
 ## How the architecture doc maps to code
 
 | Doc section | Code |
@@ -66,6 +71,45 @@ the public form and its guest account (see below), consistent with BR-003.
 | Section 7 — Rate Table | `RateTableEntry` model (append-only) + `resolveCurrentRate()` in `src/lib/workflows.ts`, called from WF03 at the moment of approval |
 | Section 8 — Audit fields | Current-value fields live on `ParkingRequest`; the append-only `RequestEvent` table is this build's substitute for Microsoft Lists' native version history (which isn't automatic outside SharePoint) |
 | Section 9 — BR-001..BR-008 | Enforced in `src/lib/workflows.ts` and role checks in `src/app/api/**/route.ts`; see inline comments referencing each BR |
+
+## Parking Access (RFID/Card/Metal Tag enrollment)
+
+A second, parallel request type — under the same ownership as Parking
+Space, sharing its staff accounts/roles, but **not** in `ARCHITECTURE.md`
+(which only describes Parking Space) and **not** the same data model or
+workflow. It digitizes a different paper form, "Enrollment for Parking
+ACCESS" (PPI Form2_Rev4_7), whose process is a simple linear flow rather
+than Parking Space's fork-join structure:
+
+```
+Submitted -> Processed (Parking Management validates/endorses and issues
+the access in one combined step) -> Completed (client confirmed receipt)
+```
+
+(or `Cancelled` from either non-terminal state). Public intake is
+`/access/new` (no login, same guest-account pattern as `/requests/new` —
+see `src/lib/guest.ts`, shared by both). Staff work it from
+`/access/dashboard` and `/access/[id]`; only **Parking Management** has
+anything to actually do (AWF02/AWF03), but every role can view it. Own
+Prisma models (`AccessRequest`, `AccessRequestEvent`), own lib
+(`src/lib/access-types.ts`, `access-validation.ts`, `access-workflows.ts`),
+own API routes under `/api/access-requests`.
+
+**The login/system selector is a display choice, not a permission
+boundary** — the same Prepared By / Validated By / Parking Management
+accounts work both systems. Picking "Parking Space" or "Parking Access" at
+login (or the "Switch to..." link in the nav bar once logged in) only
+decides which dashboard you land on first.
+
+**The "APPROVED BY: Requestor's Authorized Approver Only" line is a
+captured name field, not a workflow gate** — that's someone at the
+*client's* company approving, and there's no login system for external
+companies to actually gate on. `approverName` is optional plain text on
+the intake form, informational only.
+
+Both public forms (`/requests/new`, `/access/new`) cross-link to each other
+via `RequestTypeLinks` at the top, in case someone lands on the wrong one
+(e.g. the wrong QR code).
 
 ### Design decisions not fully pinned by the doc
 
