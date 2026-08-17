@@ -6,7 +6,6 @@ import type { Role } from "@/lib/types";
 
 type RequestShape = {
   id: string;
-  requesterId: string;
   status: string;
   slotStatus: string;
   preferredParkingLocation: string;
@@ -57,12 +56,10 @@ function ActionShell({
 export default function RequestActions({
   request,
   role,
-  userId,
   availableSpaces = [],
 }: {
   request: RequestShape;
   role: Role;
-  userId: string;
   availableSpaces?: AvailableSpace[];
 }) {
   const router = useRouter();
@@ -198,26 +195,8 @@ export default function RequestActions({
     }
   }
 
-  // Cancel — any non-terminal state, any staff role other than Prepared By
-  // (requestors never log in, so there's no self-cancel path)
-  const canCancel = request.status !== "Completed" && request.status !== "Cancelled" && role !== "PREPARED_BY";
-  if (canCancel) {
-    panels.push(
-      <ActionShell
-        key="cancel"
-        title="Cancel request"
-        loading={loading}
-        error={error}
-        submitLabel="Cancel Request"
-        danger
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!confirm("Cancel this request? This cannot be undone.")) return;
-          run(() => call(`/api/requests/${request.id}/cancel`));
-        }}
-      />
-    );
-  }
+  // Cancel — moved to CancelRequestAction, rendered at the very bottom of
+  // the page instead of grouped with these stage-specific panels.
 
   if (panels.length === 0) return null;
 

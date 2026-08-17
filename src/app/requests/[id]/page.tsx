@@ -7,6 +7,7 @@ import Timeline from "@/components/Timeline";
 import RequestActions from "@/components/RequestActions";
 import EditableRequestDetails from "@/components/EditableRequestDetails";
 import PaymentConfirmForm from "@/components/PaymentConfirmForm";
+import CancelRequestAction from "@/components/CancelRequestAction";
 import type { Role } from "@/lib/types";
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
@@ -107,14 +108,12 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
       <RequestActions
         request={{
           id: request.id,
-          requesterId: request.requesterId,
           status: request.status,
           slotStatus: request.slotStatus,
           preferredParkingLocation: request.preferredParkingLocation,
         }}
         availableSpaces={availableSpaces}
         role={session.role as Role}
-        userId={session.sub}
       />
 
       {(() => {
@@ -220,6 +219,8 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
       <Field label="Completed Date" value={fmt(request.completedDate)} />
 
       <Timeline events={request.events} />
+
+      <CancelRequestAction requestId={request.id} status={request.status} role={session.role as Role} />
     </div>
   );
 }
