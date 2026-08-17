@@ -9,6 +9,7 @@ import EditableRequestDetails from "@/components/EditableRequestDetails";
 import PaymentConfirmForm from "@/components/PaymentConfirmForm";
 import SlotAssignForm from "@/components/SlotAssignForm";
 import CancelRequestAction from "@/components/CancelRequestAction";
+import DownloadMenu from "@/components/DownloadMenu";
 import type { Role } from "@/lib/types";
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
@@ -87,17 +88,29 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
           <h1 className="text-2xl font-semibold tracking-tight">{request.companyName}</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">Submitted by {request.requester.name}</p>
         </div>
-        <div className="flex gap-2">
-          <a href={`/api/requests/export?format=pdf&id=${request.id}`} className="btn-secondary py-1.5">
-            PDF
-          </a>
-          <a href={`/api/requests/export?format=csv&id=${request.id}`} className="btn-secondary py-1.5">
-            CSV
-          </a>
-          <a href={`/api/requests/export?format=xlsx&id=${request.id}`} className="btn-secondary py-1.5">
-            XLSX
-          </a>
-        </div>
+        <DownloadMenu
+          label="Download"
+          options={[
+            {
+              format: "pdf",
+              label: "PDF",
+              description: "Fillable form, ready to print",
+              href: `/api/requests/export?format=pdf&id=${request.id}`,
+            },
+            {
+              format: "xlsx",
+              label: "XLSX",
+              description: "Excel workbook",
+              href: `/api/requests/export?format=xlsx&id=${request.id}`,
+            },
+            {
+              format: "csv",
+              label: "CSV",
+              description: "Plain text, any spreadsheet app",
+              href: `/api/requests/export?format=csv&id=${request.id}`,
+            },
+          ]}
+        />
       </div>
 
       {/* BR-008: Status and Approval Stage are never merged; Payment/Slot are

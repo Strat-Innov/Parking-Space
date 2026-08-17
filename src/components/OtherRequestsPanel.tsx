@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import StatusBadge from "@/components/StatusBadge";
+import DownloadMenu from "@/components/DownloadMenu";
 import { STATUSES, SERVICE_TYPES } from "@/lib/types";
 
 export type OtherRequestRow = {
@@ -43,6 +44,12 @@ export default function OtherRequestsPanel({ rows }: { rows: OtherRequestRow[] }
     return `/api/requests/export?${params.toString()}`;
   }
 
+  const exportOptions = [
+    { format: "pdf", label: "PDF", description: "Fillable form, one page per request", href: exportHref("pdf") },
+    { format: "xlsx", label: "XLSX", description: "Excel workbook", href: exportHref("xlsx") },
+    { format: "csv", label: "CSV", description: "Plain text, any spreadsheet app", href: exportHref("csv") },
+  ];
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-end gap-3">
@@ -72,16 +79,8 @@ export default function OtherRequestsPanel({ rows }: { rows: OtherRequestRow[] }
             ))}
           </select>
         </div>
-        <div className="ml-auto flex gap-2">
-          <a href={exportHref("csv")} className="btn-secondary py-1.5">
-            Export CSV
-          </a>
-          <a href={exportHref("xlsx")} className="btn-secondary py-1.5">
-            Export XLSX
-          </a>
-          <a href={exportHref("pdf")} className="btn-secondary py-1.5">
-            Export PDF
-          </a>
+        <div className="ml-auto">
+          <DownloadMenu label="Export" options={exportOptions} />
         </div>
       </div>
 
