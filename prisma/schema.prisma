@@ -21,7 +21,7 @@ model User {
   name         String
   email        String   @unique
   passwordHash String
-  role         String // REQUESTER | PREPARED_BY | VALIDATED_BY | CASHIER | PARKING_MANAGEMENT
+  role         String // REQUESTER | PREPARED_BY | VALIDATED_BY | PARKING_MANAGEMENT (CASHIER retired — historical rows may still carry it)
   createdAt    DateTime @default(now())
 
   requestsSubmitted ParkingRequest[] @relation("Requester")

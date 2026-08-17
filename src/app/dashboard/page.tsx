@@ -11,11 +11,10 @@ type Row = ParkingRequest & { requester: { name: string } };
 function isActionable(role: Role, r: Pick<ParkingRequest, "status" | "paymentStatus" | "slotStatus">) {
   switch (role) {
     case "PREPARED_BY":
-      return r.status === "In Preparation";
+      // WF02 (prepare/endorse) and WF04 (confirm payment) both land here now.
+      return r.status === "In Preparation" || (r.status === "Approved" && r.paymentStatus !== "Confirmed");
     case "VALIDATED_BY":
       return r.status === "Pending Approval";
-    case "CASHIER":
-      return r.status === "Approved" && r.paymentStatus !== "Confirmed";
     case "PARKING_MANAGEMENT":
       return r.status === "Approved" && r.slotStatus !== "Assigned";
     default:

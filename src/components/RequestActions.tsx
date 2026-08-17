@@ -8,7 +8,6 @@ type RequestShape = {
   id: string;
   requesterId: string;
   status: string;
-  paymentStatus: string;
   slotStatus: string;
   preferredParkingLocation: string;
 };
@@ -70,7 +69,6 @@ export default function RequestActions({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
-  const [receiptRef, setReceiptRef] = useState("");
   const [parkingSpaceId, setParkingSpaceId] = useState("");
 
   async function run(fn: () => Promise<unknown>) {
@@ -128,43 +126,9 @@ export default function RequestActions({
     );
   }
 
-  // WF04 — Cashier (independent track, BR-006)
-  if (role === "CASHIER" && request.status === "Approved" && request.paymentStatus !== "Confirmed") {
-    if (request.paymentStatus === "Not Started") {
-      panels.push(
-        <ActionShell
-          key="wf04-start"
-          title="Start payment processing (WF04)"
-          loading={loading}
-          error={error}
-          submitLabel="Start Payment"
-          onSubmit={(e) => {
-            e.preventDefault();
-            run(() => call(`/api/requests/${request.id}/payment`, { action: "start" }));
-          }}
-        />
-      );
-    } else {
-      panels.push(
-        <ActionShell
-          key="wf04-confirm"
-          title="Confirm payment (WF04)"
-          loading={loading}
-          error={error}
-          submitLabel="Confirm Payment"
-          onSubmit={(e) => {
-            e.preventDefault();
-            run(() => call(`/api/requests/${request.id}/payment`, { action: "confirm", officialReceiptReference: receiptRef }));
-          }}
-        >
-          <div className="field">
-            <label>Official Receipt Reference</label>
-            <input required value={receiptRef} onChange={(e) => setReceiptRef(e.target.value)} />
-          </div>
-        </ActionShell>
-      );
-    }
-  }
+  // WF04 — Prepared By confirms payment inline on the Payment Track card
+  // (see PaymentConfirmForm in requests/[id]/page.tsx), not here — it's a
+  // field edit, not a standalone action.
 
   // WF05 — Parking Management (independent track, BR-006). Only spaces free
   // for this request's exact date range are offered (see availableSpaces in

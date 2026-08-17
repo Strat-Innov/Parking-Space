@@ -45,14 +45,14 @@ in turn to walk it through the lifecycle. Demo accounts (password for all:
 |---|---|
 | Prepared By | `prepared@parking.local` |
 | Validated By | `validator@parking.local` |
-| Cashier | `cashier@parking.local` |
 | Parking Management | `parkingmgmt@parking.local` |
 
 **Prepared By** marks the request ready, **Validated By** approves it, then
-**Cashier** and **Parking Management** can each act in any order — that
-independence is the whole point of BR-006. Requestors never log in;
-submission and status are handled entirely through the public form and its
-guest account (see below), consistent with BR-003.
+**Prepared By** confirms payment and **Parking Management** assigns a slot —
+independently, in any order, still the same BR-006 guarantee (see the
+Cashier note below for why payment confirmation moved to Prepared By).
+Requestors never log in; submission and status are handled entirely through
+the public form and its guest account (see below), consistent with BR-003.
 
 ## How the architecture doc maps to code
 
@@ -69,6 +69,21 @@ guest account (see below), consistent with BR-003.
 
 ### Design decisions not fully pinned by the doc
 
+- **WF04 owner is Prepared By, not Cashier** — this one actively overrides
+  the doc's Section 3 table (`WF04 Owner: Cashier`), a deliberate later
+  decision rather than a gap the doc left open. There's no more standalone
+  Cashier role or dashboard queue; `wf04ConfirmPayment` now requires
+  `PREPARED_BY` and is a plain field edit (Official Receipt Reference + Pay
+  Date, both directly editable) on the request's Payment Track card once
+  `Status = "Approved"` — no separate action panel, no intermediate
+  "Pending" step. BR-006 independence is unaffected: WF04 and WF05
+  (`wf05AssignSlot`, still Parking Management) still never read each
+  other's track, they're just no longer split across two different staff
+  roles. The underlying `cashierId`/`cashier` column and relation names are
+  unchanged (no schema migration needed) — they simply record whichever
+  Prepared By staffer confirmed the payment now. `CASHIER` stays a valid
+  historical value (removed from `ROLES`/`ROLE_LABELS`, blocked at login)
+  purely so old `RequestEvent` rows display correctly in the Timeline.
 - **BR-006 independence** is enforced structurally: `wf04ConfirmPayment` and
   `wf05AssignSlot` each only read/write their own track and then hand off to
   `wf06CheckCompletion` — neither ever reads the other's status directly.

@@ -22,8 +22,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
     }
     // Requestors never log in — submission is the public /requests/new form
-    // (BR-003: once submitted, the requester has no further access).
-    if (user.role === "REQUESTER") {
+    // (BR-003: once submitted, the requester has no further access). Cashier
+    // is retired — WF04 payment confirmation moved to Prepared By, an
+    // inline field edit rather than a separate role/action.
+    if (user.role === "REQUESTER" || user.role === "CASHIER") {
       return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
     }
 

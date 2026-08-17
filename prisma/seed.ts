@@ -8,7 +8,6 @@ const DEMO_PASSWORD = "demo1234";
 const USERS = [
   { name: "Pat Preparer", email: "prepared@parking.local", role: "PREPARED_BY" },
   { name: "Val Validator", email: "validator@parking.local", role: "VALIDATED_BY" },
-  { name: "Cass Cashier", email: "cashier@parking.local", role: "CASHIER" },
   { name: "Morgan Manager", email: "parkingmgmt@parking.local", role: "PARKING_MANAGEMENT" },
 ];
 

@@ -6,6 +6,7 @@ import StatusBadge from "@/components/StatusBadge";
 import Timeline from "@/components/Timeline";
 import RequestActions from "@/components/RequestActions";
 import RequestDetailsForm from "@/components/RequestDetailsForm";
+import PaymentConfirmForm from "@/components/PaymentConfirmForm";
 import type { Role } from "@/lib/types";
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
@@ -60,6 +61,10 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
   // has filtered/verified the intake already and hands off from here, so
   // Validated By's decision fields aren't their concern to see.
   const showApprovalCard = session.role !== "PREPARED_BY";
+  // WF04, owned by Prepared By — a plain field edit on this card rather than
+  // a separate action panel (see PaymentConfirmForm).
+  const canConfirmPayment =
+    session.role === "PREPARED_BY" && request.status === "Approved" && request.paymentStatus !== "Confirmed";
 
   const fmt = (d: Date | null) => (d ? new Date(d).toLocaleString() : "—");
   // Daily/Monthly store midnight as an implementation detail (see
@@ -104,7 +109,6 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
           id: request.id,
           requesterId: request.requesterId,
           status: request.status,
-          paymentStatus: request.paymentStatus,
           slotStatus: request.slotStatus,
           preferredParkingLocation: request.preferredParkingLocation,
         }}
@@ -179,10 +183,7 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
       <div className="grid gap-6 sm:grid-cols-2">
         <div className="card">
           <h2 className="mb-4 text-lg font-semibold tracking-tight">Payment Track (WF04)</h2>
-          <dl className="space-y-3">
-            <Field label="Cashier" value={request.cashier?.name} />
-            <Field label="Pay Date" value={fmt(request.payDate)} />
-            <Field label="Official Receipt Reference" value={request.officialReceiptReference} />
+          <dl className="mb-4 space-y-3">
             <Field
               label="Rate Snapshot"
               value={
@@ -193,6 +194,15 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
             />
             <Field label="Total Payment Due" value={request.totalPaymentDue != null ? request.totalPaymentDue.toFixed(2) : "—"} />
           </dl>
+          {canConfirmPayment ? (
+            <PaymentConfirmForm requestId={request.id} />
+          ) : (
+            <dl className="space-y-3 border-t border-slate-100 pt-4">
+              <Field label="Confirmed By" value={request.cashier?.name} />
+              <Field label="Pay Date" value={fmt(request.payDate)} />
+              <Field label="Official Receipt Reference" value={request.officialReceiptReference} />
+            </dl>
+          )}
         </div>
         <div className="card">
           <h2 className="mb-4 text-lg font-semibold tracking-tight">Slot Track (WF05)</h2>

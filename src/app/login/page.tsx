@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 const DEMO_ACCOUNTS = [
   { label: "Prepared By", email: "prepared@parking.local" },
   { label: "Validated By", email: "validator@parking.local" },
-  { label: "Cashier", email: "cashier@parking.local" },
   { label: "Parking Management", email: "parkingmgmt@parking.local" },
 ];
 

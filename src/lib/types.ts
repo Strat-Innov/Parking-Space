@@ -3,13 +3,12 @@
 // header comment). BR-008: Status and ApprovalStage are deliberately
 // disjoint types; nothing may merge them.
 
-export const ROLES = [
-  "REQUESTER",
-  "PREPARED_BY",
-  "VALIDATED_BY",
-  "CASHIER",
-  "PARKING_MANAGEMENT",
-] as const;
+// CASHIER is retired — WF04 payment confirmation moved to Prepared By (an
+// inline field edit, not a separate role). Historical RequestEvent/User rows
+// may still carry the literal string "CASHIER"; that's fine since those are
+// plain strings, not a DB enum, and Timeline displays actor.role verbatim
+// rather than through ROLE_LABELS.
+export const ROLES = ["REQUESTER", "PREPARED_BY", "VALIDATED_BY", "PARKING_MANAGEMENT"] as const;
 export type Role = (typeof ROLES)[number];
 
 export const SERVICE_TYPES = ["Hourly", "Daily", "Monthly"] as const;
@@ -52,6 +51,5 @@ export const ROLE_LABELS: Record<Role, string> = {
   REQUESTER: "Requestor",
   PREPARED_BY: "Prepared By",
   VALIDATED_BY: "Validated By",
-  CASHIER: "Cashier",
   PARKING_MANAGEMENT: "Parking Management",
 };

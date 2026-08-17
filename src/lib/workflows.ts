@@ -316,25 +316,22 @@ async function wf06CheckCompletion(tx: Tx, requestId: string) {
 }
 
 // --- WF04 — Payment Processing (independent track, BR-006) ------------------------
+// Owned by Prepared By, not a separate Cashier role — a single-step inline
+// edit (Official Receipt Reference + Pay Date) rather than a two-phase
+// start/confirm flow, since there's no longer a second actor for "Pending"
+// to signal handoff to. cashierId/cashier stay the underlying column/relation
+// names (no schema change) but now record whichever Prepared By staffer
+// confirmed the payment.
 
-export async function wf04StartPayment(requestId: string, actor: SessionPayload) {
-  if (actor.role !== "CASHIER") throw new WorkflowError("Only Cashier can process payment.", 403);
-  return prisma.$transaction(async (tx) => {
-    const req = await tx.parkingRequest.findUniqueOrThrow({ where: { id: requestId } });
-    if (req.status !== "Approved") throw new WorkflowError('WF04 requires Status = "Approved".', 409);
-    if (req.paymentStatus !== "Not Started") throw new WorkflowError(`Payment already ${req.paymentStatus}.`, 409);
-    const updated = await tx.parkingRequest.update({
-      where: { id: requestId },
-      data: { paymentStatus: "Pending", cashierId: actor.sub },
-    });
-    await logEvent(tx, requestId, "WF04", null, null, actor.sub, "Payment processing started");
-    return updated;
-  });
-}
-
-export async function wf04ConfirmPayment(requestId: string, actor: SessionPayload, officialReceiptReference: string) {
-  if (actor.role !== "CASHIER") throw new WorkflowError("Only Cashier can confirm payment.", 403);
+export async function wf04ConfirmPayment(
+  requestId: string,
+  actor: SessionPayload,
+  officialReceiptReference: string,
+  payDate: Date
+) {
+  if (actor.role !== "PREPARED_BY") throw new WorkflowError("Only Prepared By can confirm payment.", 403);
   if (!officialReceiptReference?.trim()) throw new WorkflowError("Official Receipt Reference is required.", 422);
+  if (!payDate || Number.isNaN(payDate.getTime())) throw new WorkflowError("A valid Pay Date is required.", 422);
 
   return prisma.$transaction(async (tx) => {
     const req = await tx.parkingRequest.findUniqueOrThrow({ where: { id: requestId } });
@@ -346,7 +343,7 @@ export async function wf04ConfirmPayment(requestId: string, actor: SessionPayloa
       data: {
         paymentStatus: "Confirmed",
         cashierId: actor.sub,
-        payDate: new Date(),
+        payDate,
         officialReceiptReference,
       },
     });
