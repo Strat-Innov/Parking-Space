@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import StatusBadge from "@/components/StatusBadge";
 import { SERVICE_TYPES } from "@/lib/types";
@@ -24,13 +24,126 @@ function fmt(iso?: string) {
   return iso ? new Date(iso).toLocaleString() : "";
 }
 
+function LocationModal({
+  location,
+  slots,
+  canMaintain,
+  busyId,
+  onRemove,
+  onClose,
+}: {
+  location: string;
+  slots: ParkingSpaceRow[];
+  canMaintain: boolean;
+  busyId: string | null;
+  onRemove: (id: string) => void;
+  onClose: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [serviceFilter, setServiceFilter] = useState("All");
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return slots
+      .filter((s) => !q || s.slotNumber.toLowerCase().includes(q))
+      .filter((s) => serviceFilter === "All" || s.currentBooking?.serviceType === serviceFilter)
+      .sort((a, b) => a.slotNumber.localeCompare(b.slotNumber, undefined, { numeric: true }));
+  }, [slots, query, serviceFilter]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" onClick={onClose}>
+      <div
+        className="card max-h-[85vh] w-full max-w-2xl overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label={location}
+      >
+        <div className="mb-4 flex items-start justify-between">
+          <h2 className="text-lg font-semibold tracking-tight">{location}</h2>
+          <button type="button" onClick={onClose} aria-label="Close" className="text-slate-400 hover:text-slate-700">
+            ✕
+          </button>
+        </div>
+
+        <div className="mb-4 space-y-3">
+          <div className="field">
+            <label>Search slot number</label>
+            <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="e.g. A-01" />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium text-slate-500">Filter by current booking:</span>
+            {FILTERS.map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setServiceFilter(f)}
+                className={`rounded-full px-3 py-1 text-xs font-medium ${
+                  serviceFilter === f
+                    ? "bg-slate-900 text-white"
+                    : "border border-slate-300 bg-white text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          {filtered.length === 0 && <p className="text-sm text-slate-400">No slots match.</p>}
+          {filtered.map((s) => (
+            <div
+              key={s.id}
+              className={`flex flex-wrap items-center gap-4 rounded-lg border border-slate-200 px-3 py-2 text-sm ${
+                !s.isActive ? "opacity-50" : ""
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span className="font-mono font-medium">{s.slotNumber}</span>
+                <StatusBadge value={!s.isActive ? "Removed" : s.isLockedNow ? "Occupied now" : "Available"} />
+              </div>
+              <div className="flex-1 text-right text-xs text-slate-500">
+                {!s.isActive
+                  ? "Removed from inventory"
+                  : s.currentBooking
+                  ? `${s.currentBooking.company} (${s.currentBooking.serviceType}) — until ${fmt(s.currentBooking.until)}`
+                  : s.nextBooking
+                  ? `Available — next: ${s.nextBooking.company} (${s.nextBooking.serviceType}) from ${fmt(s.nextBooking.from)}`
+                  : "Available — no upcoming bookings"}
+              </div>
+              {canMaintain && s.isActive && (
+                <button
+                  type="button"
+                  disabled={busyId === s.id}
+                  onClick={() => onRemove(s.id)}
+                  className="text-xs font-medium text-red-600 underline hover:text-red-800"
+                >
+                  {busyId === s.id ? "Removing..." : "Remove"}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ParkingSpaceList({ rows, canMaintain }: { rows: ParkingSpaceRow[]; canMaintain: boolean }) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const [serviceFilter, setServiceFilter] = useState<string>("All");
+  const [openLocation, setOpenLocation] = useState<string | null>(null);
 
   async function onRemove(id: string) {
     if (!confirm("Remove this parking space? This can't be undone.")) return;
@@ -48,14 +161,13 @@ export default function ParkingSpaceList({ rows, canMaintain }: { rows: ParkingS
     }
   }
 
+  // Filters which locations appear in the summary table below.
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return rows;
     return rows.filter((r) => r.location.toLowerCase().includes(q));
   }, [rows, query]);
 
-  // One row per distinct location — the same search box narrows this
-  // summary and each location's expanded slot list together.
   const locations = useMemo(() => {
     const byLocation = new Map<string, { location: string; total: number; available: number; occupied: number }>();
     for (const r of filteredRows) {
@@ -70,32 +182,28 @@ export default function ParkingSpaceList({ rows, canMaintain }: { rows: ParkingS
     return Array.from(byLocation.values()).sort((a, b) => a.location.localeCompare(b.location));
   }, [filteredRows]);
 
-  function toggleExpand(location: string) {
-    setExpanded((cur) => (cur === location ? null : location));
-    setServiceFilter("All");
-  }
+  const openLocationSlots = openLocation ? rows.filter((r) => r.location === openLocation) : [];
 
   return (
     <div className="space-y-6">
       <div className="field max-w-sm">
-        <label>Search by location</label>
+        <label>Filter locations</label>
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="e.g. Axis, Festival, Bloc 10..." />
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       <div>
-        <h2 className="mb-1 text-lg font-semibold tracking-tight">Parking Locations</h2>
-        <p className="mb-2 text-xs text-slate-500">Click a location to see its individual slots.</p>
+        <h2 className="mb-2 text-lg font-semibold tracking-tight">Parking Locations</h2>
         <div className="card table-wrap overflow-x-auto p-0">
           <table>
             <thead>
               <tr>
-                <th></th>
                 <th>Location</th>
                 <th>Total Slots</th>
                 <th>Available</th>
                 <th>Occupied Now</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -106,88 +214,38 @@ export default function ParkingSpaceList({ rows, canMaintain }: { rows: ParkingS
                   </td>
                 </tr>
               )}
-              {locations.map((l) => {
-                const isOpen = expanded === l.location;
-                const slots = filteredRows
-                  .filter((r) => r.location === l.location)
-                  .filter((r) => serviceFilter === "All" || r.currentBooking?.serviceType === serviceFilter)
-                  .sort((a, b) => a.slotNumber.localeCompare(b.slotNumber, undefined, { numeric: true }));
-
-                return (
-                  <Fragment key={l.location}>
-                    <tr onClick={() => toggleExpand(l.location)} className="cursor-pointer">
-                      <td className="w-6 text-slate-400">{isOpen ? "▾" : "▸"}</td>
-                      <td className="font-medium text-slate-900">{l.location}</td>
-                      <td>{l.total}</td>
-                      <td>{l.available}</td>
-                      <td>{l.occupied}</td>
-                    </tr>
-                    {isOpen && (
-                      <tr>
-                        <td colSpan={5} className="bg-slate-50 p-4">
-                          <div className="mb-3 flex flex-wrap items-center gap-2">
-                            <span className="text-xs font-medium text-slate-500">Filter by current booking:</span>
-                            {FILTERS.map((f) => (
-                              <button
-                                key={f}
-                                type="button"
-                                onClick={() => setServiceFilter(f)}
-                                className={`rounded-full px-3 py-1 text-xs font-medium ${
-                                  serviceFilter === f
-                                    ? "bg-slate-900 text-white"
-                                    : "border border-slate-300 bg-white text-slate-600 hover:bg-slate-100"
-                                }`}
-                              >
-                                {f}
-                              </button>
-                            ))}
-                          </div>
-
-                          <div className="space-y-2">
-                            {slots.length === 0 && <p className="text-sm text-slate-400">No slots match this filter.</p>}
-                            {slots.map((s) => (
-                              <div
-                                key={s.id}
-                                className={`flex flex-wrap items-center gap-4 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm ${
-                                  !s.isActive ? "opacity-50" : ""
-                                }`}
-                              >
-                                <div className="flex items-center gap-2">
-                                  <span className="font-mono font-medium">{s.slotNumber}</span>
-                                  <StatusBadge value={!s.isActive ? "Removed" : s.isLockedNow ? "Occupied now" : "Available"} />
-                                </div>
-                                <div className="flex-1 text-right text-xs text-slate-500">
-                                  {!s.isActive
-                                    ? "Removed from inventory"
-                                    : s.currentBooking
-                                    ? `${s.currentBooking.company} (${s.currentBooking.serviceType}) — until ${fmt(s.currentBooking.until)}`
-                                    : s.nextBooking
-                                    ? `Available — next: ${s.nextBooking.company} (${s.nextBooking.serviceType}) from ${fmt(s.nextBooking.from)}`
-                                    : "Available — no upcoming bookings"}
-                                </div>
-                                {canMaintain && s.isActive && (
-                                  <button
-                                    type="button"
-                                    disabled={busyId === s.id}
-                                    onClick={() => onRemove(s.id)}
-                                    className="text-xs font-medium text-red-600 underline hover:text-red-800"
-                                  >
-                                    {busyId === s.id ? "Removing..." : "Remove"}
-                                  </button>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
-                );
-              })}
+              {locations.map((l) => (
+                <tr key={l.location}>
+                  <td>{l.location}</td>
+                  <td>{l.total}</td>
+                  <td>{l.available}</td>
+                  <td>{l.occupied}</td>
+                  <td>
+                    <button
+                      type="button"
+                      onClick={() => setOpenLocation(l.location)}
+                      className="text-sm font-medium text-slate-700 underline hover:text-slate-900"
+                    >
+                      View Slots
+                    </button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       </div>
+
+      {openLocation && (
+        <LocationModal
+          location={openLocation}
+          slots={openLocationSlots}
+          canMaintain={canMaintain}
+          busyId={busyId}
+          onRemove={onRemove}
+          onClose={() => setOpenLocation(null)}
+        />
+      )}
     </div>
   );
 }
