@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SERVICE_TYPES } from "@/lib/types";
 import { toDateStr, toTimeStr, minEndDateFor } from "@/lib/parking-date-helpers";
+
+const OTHER_LOCATION = "__other__";
 
 export type RequestDetailsFormInitial = {
   fullName: string;
@@ -84,6 +86,42 @@ export default function RequestDetailsForm({
   const [error, setError] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<"save" | "endorse" | null>(null);
   const loading = busyAction !== null;
+
+  const [locations, setLocations] = useState<string[]>([]);
+  const [locationMode, setLocationMode] = useState<"select" | "other">("select");
+
+  // Fed by the Parking Location inventory — always fetched fresh (not
+  // baked in) so a space added after this page loaded still shows up.
+  // Re-fetched on focus in case the form was left open while someone else
+  // added one.
+  useEffect(() => {
+    let cancelled = false;
+    async function loadLocations() {
+      try {
+        const res = await fetch("/api/parking-spaces/locations");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setLocations(data.locations ?? []);
+      } catch {
+        // non-fatal — falls back to "Other" only
+      }
+    }
+    loadLocations();
+    window.addEventListener("focus", loadLocations);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", loadLocations);
+    };
+  }, []);
+
+  // An existing value (edit mode, or a location later removed from the
+  // inventory) that isn't in the fetched list needs the free-text fallback.
+  useEffect(() => {
+    if (locations.length > 0 && form.preferredParkingLocation && !locations.includes(form.preferredParkingLocation)) {
+      setLocationMode("other");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locations]);
 
   const isHourly = form.serviceType === "Hourly";
 
@@ -252,11 +290,51 @@ export default function RequestDetailsForm({
       <div className="grid grid-cols-2 gap-4">
         <div className="field">
           <label>Preferred Parking Location</label>
-          <input
-            required
-            value={form.preferredParkingLocation}
-            onChange={(e) => update("preferredParkingLocation", e.target.value)}
-          />
+          {locationMode === "other" ? (
+            <div className="space-y-1">
+              <input
+                required
+                value={form.preferredParkingLocation}
+                onChange={(e) => update("preferredParkingLocation", e.target.value)}
+                placeholder="Type the location name"
+              />
+              {locations.length > 0 && (
+                <button
+                  type="button"
+                  className="text-xs text-slate-500 underline"
+                  onClick={() => {
+                    setLocationMode("select");
+                    update("preferredParkingLocation", "");
+                  }}
+                >
+                  Choose from the list instead
+                </button>
+              )}
+            </div>
+          ) : (
+            <select
+              required
+              value={form.preferredParkingLocation}
+              onChange={(e) => {
+                if (e.target.value === OTHER_LOCATION) {
+                  setLocationMode("other");
+                  update("preferredParkingLocation", "");
+                } else {
+                  update("preferredParkingLocation", e.target.value);
+                }
+              }}
+            >
+              <option value="" disabled>
+                Select a location...
+              </option>
+              {locations.map((loc) => (
+                <option key={loc} value={loc}>
+                  {loc}
+                </option>
+              ))}
+              <option value={OTHER_LOCATION}>Other (not listed yet)</option>
+            </select>
+          )}
         </div>
         <div className="field">
           <label>Parking Slot Number (optional)</label>
