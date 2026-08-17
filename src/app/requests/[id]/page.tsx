@@ -5,7 +5,7 @@ import { findLockedSpaceIds } from "@/lib/workflows";
 import StatusBadge from "@/components/StatusBadge";
 import Timeline from "@/components/Timeline";
 import RequestActions from "@/components/RequestActions";
-import RequestDetailsForm from "@/components/RequestDetailsForm";
+import EditableRequestDetails from "@/components/EditableRequestDetails";
 import PaymentConfirmForm from "@/components/PaymentConfirmForm";
 import type { Role } from "@/lib/types";
 
@@ -117,28 +117,8 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
         userId={session.sub}
       />
 
-      {canEditDetails ? (
-        <div>
-          <h2 className="mb-2 text-lg font-semibold tracking-tight">Request Details (editable)</h2>
-          <RequestDetailsForm
-            mode="edit"
-            requestId={request.id}
-            initial={{
-              fullName: request.fullName,
-              companyName: request.companyName,
-              emailAddress: request.emailAddress,
-              serviceType: request.serviceType,
-              preferredParkingLocation: request.preferredParkingLocation,
-              requestedSlot: request.requestedSlot,
-              requiredStartDate: request.requiredStartDate,
-              endDate: request.endDate,
-              purpose: request.purpose,
-            }}
-          />
-        </div>
-      ) : (
-        <div className="card">
-          <h2 className="mb-4 text-lg font-semibold tracking-tight">Request Details</h2>
+      {(() => {
+        const readOnlyDetails = (
           <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
             <Field label="Full Name" value={request.fullName} />
             <Field label="Email Address" value={request.emailAddress} />
@@ -162,8 +142,31 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
               }
             />
           </dl>
-        </div>
-      )}
+        );
+
+        return canEditDetails ? (
+          <EditableRequestDetails
+            requestId={request.id}
+            initial={{
+              fullName: request.fullName,
+              companyName: request.companyName,
+              emailAddress: request.emailAddress,
+              serviceType: request.serviceType,
+              preferredParkingLocation: request.preferredParkingLocation,
+              requestedSlot: request.requestedSlot,
+              requiredStartDate: request.requiredStartDate,
+              endDate: request.endDate,
+              purpose: request.purpose,
+            }}
+            readOnlyView={readOnlyDetails}
+          />
+        ) : (
+          <div className="card">
+            <h2 className="mb-4 text-lg font-semibold tracking-tight">Request Details</h2>
+            {readOnlyDetails}
+          </div>
+        );
+      })()}
 
       {showApprovalCard && (
         <div className="card">

@@ -83,9 +83,14 @@ export default function RequestDetailsForm({
   const [submittedId, setSubmittedId] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [form, setForm] = useState<FormState>(initial ? fromInitial(initial) : blankForm());
+  // Baseline to diff against for "is there anything to save" — reset to the
+  // current form after each successful save, so Save Changes disappears
+  // again until the next real edit.
+  const [savedSnapshot, setSavedSnapshot] = useState<FormState>(form);
   const [error, setError] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<"save" | "endorse" | null>(null);
   const loading = busyAction !== null;
+  const isDirty = JSON.stringify(form) !== JSON.stringify(savedSnapshot);
 
   const [locations, setLocations] = useState<string[]>([]);
   const [locationMode, setLocationMode] = useState<"select" | "other">("select");
@@ -168,6 +173,7 @@ export default function RequestDetailsForm({
         setSubmittedId(data.request.id);
       } else {
         setSaved(true);
+        setSavedSnapshot(form);
         router.refresh();
         onSaved?.();
       }
@@ -427,9 +433,11 @@ export default function RequestDetailsForm({
       {saved && !error && <p className="text-sm text-emerald-600">Saved.</p>}
 
       <div className="flex items-center gap-3">
-        <button type="submit" disabled={loading} className="btn-primary">
-          {busyAction === "save" ? "Saving..." : mode === "create" ? "Submit Request" : "Save Changes"}
-        </button>
+        {(mode === "create" || isDirty) && (
+          <button type="submit" disabled={loading} className="btn-primary">
+            {busyAction === "save" ? "Saving..." : mode === "create" ? "Submit Request" : "Save Changes"}
+          </button>
+        )}
         {mode === "edit" && (
           <button type="button" disabled={loading} onClick={onEndorse} className="btn-secondary">
             {busyAction === "endorse" ? "Endorsing..." : "Endorse for Validation"}
