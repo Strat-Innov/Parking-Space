@@ -121,14 +121,23 @@ export async function GET(req: NextRequest) {
     // renderToBuffer's types expect a <Document> element directly; our
     // component returns exactly that, but TS can't see through the
     // function-component boundary to verify it — safe to assert.
-    const pdfElement = createElement(ParkingRequestFormDocument, { requests: pdfData }) as unknown as ReactElement<DocumentProps>;
-    const buffer = await renderToBuffer(pdfElement);
-    return new NextResponse(new Uint8Array(buffer), {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${filenameBase}.pdf"`,
-      },
-    });
+    try {
+      const pdfElement = createElement(ParkingRequestFormDocument, { requests: pdfData }) as unknown as ReactElement<DocumentProps>;
+      const buffer = await renderToBuffer(pdfElement);
+      return new NextResponse(new Uint8Array(buffer), {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="${filenameBase}.pdf"`,
+        },
+      });
+    } catch (pdfErr) {
+      // Temporary — surfaces the real cause instead of a generic 500 while
+      // this is being debugged in production. Narrow scope (this route
+      // only), not sensitive (render-library error text, no secrets).
+      console.error("PDF export failed:", pdfErr);
+      const message = pdfErr instanceof Error ? `${pdfErr.name}: ${pdfErr.message}` : String(pdfErr);
+      return NextResponse.json({ error: `PDF generation failed: ${message}` }, { status: 500 });
+    }
   } catch (err) {
     return handleApiError(err);
   }
