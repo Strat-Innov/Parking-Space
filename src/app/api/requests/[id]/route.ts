@@ -21,9 +21,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       },
     });
     if (!request) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    if (session.role === "REQUESTER" && request.requesterId !== session.sub) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
-    }
     return NextResponse.json({ request });
   } catch (err) {
     return handleApiError(err);

@@ -36,7 +36,6 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
   });
 
   if (!request) notFound();
-  if (session.role === "REQUESTER" && request.requesterId !== session.sub) notFound();
 
   // Prepared By can correct the requestor's submitted details while it's
   // still theirs to prepare — not a BR-003 violation, that rule revokes the

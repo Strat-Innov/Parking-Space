@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 const DEMO_ACCOUNTS = [
-  { label: "Requestor", email: "requester@parking.local" },
   { label: "Prepared By", email: "prepared@parking.local" },
   { label: "Validated By", email: "validator@parking.local" },
   { label: "Cashier", email: "cashier@parking.local" },

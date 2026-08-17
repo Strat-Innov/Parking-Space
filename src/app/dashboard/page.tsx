@@ -26,9 +26,7 @@ export default async function DashboardPage() {
   if (!session) redirect("/login");
   const role = session.role as Role;
 
-  const where = role === "REQUESTER" ? { requesterId: session.sub } : {};
   const requests = await prisma.parkingRequest.findMany({
-    where,
     orderBy: { createdAt: "desc" },
     include: { requester: { select: { name: true } } },
   });
@@ -43,16 +41,11 @@ export default async function DashboardPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
           <p className="text-sm text-slate-500">
             {ROLE_LABELS[role]} queue
-            {role !== "REQUESTER" && actionableCount > 0 && (
+            {actionableCount > 0 && (
               <span className="ml-2 rounded-full bg-slate-900 px-2 py-0.5 text-xs text-white">{actionableCount} need action</span>
             )}
           </p>
         </div>
-        {role === "REQUESTER" && (
-          <Link href="/requests/new" className="btn-primary">
-            New Request
-          </Link>
-        )}
       </div>
 
       <div className="card table-wrap overflow-x-auto p-0">

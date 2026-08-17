@@ -21,6 +21,11 @@ export async function POST(req: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
     }
+    // Requestors never log in — submission is the public /requests/new form
+    // (BR-003: once submitted, the requester has no further access).
+    if (user.role === "REQUESTER") {
+      return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
+    }
 
     await createSession({ sub: user.id, role: user.role as Role, name: user.name, email: user.email });
     return NextResponse.json({ ok: true, role: user.role });

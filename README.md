@@ -36,20 +36,23 @@ npm run db:seed             # seeds one demo user per role + starter rate table
 npm run dev
 ```
 
-Visit `http://localhost:3000`. Demo accounts (password for all: `demo1234`):
+Visit `http://localhost:3000`. Submit a request via the public
+`/requests/new` form (no login — see below), then log in as each staff role
+in turn to walk it through the lifecycle. Demo accounts (password for all:
+`demo1234`):
 
 | Role | Email |
 |---|---|
-| Requestor | `requester@parking.local` |
 | Prepared By | `prepared@parking.local` |
 | Validated By | `validator@parking.local` |
 | Cashier | `cashier@parking.local` |
 | Parking Management | `parkingmgmt@parking.local` |
 
-Log in as **Requester** to submit a request, then walk it through the
-lifecycle by logging in as each role in turn: **Prepared By** marks it ready,
-**Validated By** approves it, then **Cashier** and **Parking Management**
-can each act in any order — that independence is the whole point of BR-006.
+**Prepared By** marks the request ready, **Validated By** approves it, then
+**Cashier** and **Parking Management** can each act in any order — that
+independence is the whole point of BR-006. Requestors never log in;
+submission and status are handled entirely through the public form and its
+guest account (see below), consistent with BR-003.
 
 ## How the architecture doc maps to code
 
@@ -75,10 +78,11 @@ can each act in any order — that independence is the whole point of BR-006.
   `effectiveStartDate` has passed. Existing rows are never written to again
   after creation.
 - **Cancellation** permissions aren't specified in the doc beyond "reachable
-  from any non-terminal state." This build allows the owning requestor or
-  staff roles other than Prepared By to cancel (Prepared By prepares/edits
-  or endorses a request — cancelling it isn't their call), while a request
-  is not yet `Completed` or `Cancelled`.
+  from any non-terminal state." This build allows any staff role other than
+  Prepared By to cancel (Prepared By prepares/edits or endorses a request —
+  cancelling it isn't their call), while a request is not yet `Completed` or
+  `Cancelled`. Requestors never log in, so there's no self-service cancel
+  path — they'd need to ask staff.
 - **Prepared By can edit the intake fields** the requestor submitted, while
   `Status = "In Preparation"` (`updateRequestDetails` in
   `src/lib/workflows.ts`, `POST /api/requests/[id]/edit`). This is not a

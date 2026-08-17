@@ -6,7 +6,6 @@ const prisma = new PrismaClient();
 const DEMO_PASSWORD = "demo1234";
 
 const USERS = [
-  { name: "Rae Requester", email: "requester@parking.local", role: "REQUESTER" },
   { name: "Pat Preparer", email: "prepared@parking.local", role: "PREPARED_BY" },
   { name: "Val Validator", email: "validator@parking.local", role: "VALIDATED_BY" },
   { name: "Cass Cashier", email: "cashier@parking.local", role: "CASHIER" },

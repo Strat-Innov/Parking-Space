@@ -175,13 +175,9 @@ export default function RequestActions({ request, role, userId }: { request: Req
     );
   }
 
-  // Cancel — any non-terminal state, staff (other than Prepared By — see
-  // below) or the owning requestor
-  const canCancel =
-    request.status !== "Completed" &&
-    request.status !== "Cancelled" &&
-    role !== "PREPARED_BY" &&
-    (role !== "REQUESTER" || request.requesterId === userId);
+  // Cancel — any non-terminal state, any staff role other than Prepared By
+  // (requestors never log in, so there's no self-cancel path)
+  const canCancel = request.status !== "Completed" && request.status !== "Cancelled" && role !== "PREPARED_BY";
   if (canCancel) {
     panels.push(
       <ActionShell

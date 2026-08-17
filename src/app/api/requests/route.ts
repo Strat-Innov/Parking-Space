@@ -7,25 +7,14 @@ import { submitRequest } from "@/lib/workflows";
 import { handleApiError } from "@/lib/api-helpers";
 import { intakeFieldsSchema } from "@/lib/validation";
 
-// Role-scoped list: each role only sees the requests relevant to its queue,
-// keeping "who should be looking at what" out of the client entirely.
+// Every login-capable role (Prepared By, Validated By, Cashier, Parking
+// Management) sees every request — only their dashboard's actionable
+// filtering differs. Requestors never log in, so there's no self-scoped view.
 export async function GET() {
   try {
-    const session = await requireSession();
-
-    const where =
-      session.role === "REQUESTER"
-        ? { requesterId: session.sub }
-        : session.role === "PREPARED_BY"
-        ? {}
-        : session.role === "VALIDATED_BY"
-        ? {}
-        : session.role === "CASHIER"
-        ? {}
-        : {}; // PARKING_MANAGEMENT
+    await requireSession();
 
     const requests = await prisma.parkingRequest.findMany({
-      where,
       orderBy: { createdAt: "desc" },
       include: { requester: { select: { name: true, email: true } } },
     });
@@ -58,8 +47,8 @@ async function resolveGuestRequesterId(fullName: string, emailAddress: string) {
 export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
-    if (session && session.role !== "REQUESTER") {
-      return NextResponse.json({ error: "Only requestors can submit a new parking request." }, { status: 403 });
+    if (session) {
+      return NextResponse.json({ error: "Submit a new parking request via the public request form." }, { status: 403 });
     }
 
     const body = await req.json().catch(() => null);
@@ -68,9 +57,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: parsed.error.issues.map((i) => i.message).join("; ") }, { status: 422 });
     }
 
-    const requesterId = session
-      ? session.sub
-      : await resolveGuestRequesterId(parsed.data.fullName, parsed.data.emailAddress);
+    const requesterId = await resolveGuestRequesterId(parsed.data.fullName, parsed.data.emailAddress);
 
     const created = await submitRequest(parsed.data, requesterId);
     return NextResponse.json({ request: created }, { status: 201 });

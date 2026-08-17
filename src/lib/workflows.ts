@@ -394,11 +394,10 @@ export async function cancelRequest(requestId: string, actor: SessionPayload) {
     if (req.status === "Completed" || req.status === "Cancelled") {
       throw new WorkflowError(`Cannot cancel a request that is already ${req.status}.`, 409);
     }
-    const isOwner = req.requesterId === actor.sub;
     // Prepared By is deliberately excluded — they prepare/endorse or edit
-    // details, but cancellation isn't their call to make.
-    const isStaff = actor.role !== "REQUESTER" && actor.role !== "PREPARED_BY";
-    if (!isOwner && !isStaff) throw new WorkflowError("Not permitted to cancel this request.", 403);
+    // details, but cancellation isn't their call to make. Requestors never
+    // log in, so there's no owner-initiated path here either.
+    if (actor.role === "PREPARED_BY") throw new WorkflowError("Not permitted to cancel this request.", 403);
 
     const updated = await tx.parkingRequest.update({
       where: { id: requestId },
