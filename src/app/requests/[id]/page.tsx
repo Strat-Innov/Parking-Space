@@ -81,10 +81,23 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-xs font-mono text-slate-400 dark:text-slate-500">{request.id}</p>
-        <h1 className="text-2xl font-semibold tracking-tight">{request.companyName}</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">Submitted by {request.requester.name}</p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-mono text-slate-400 dark:text-slate-500">{request.id}</p>
+          <h1 className="text-2xl font-semibold tracking-tight">{request.companyName}</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Submitted by {request.requester.name}</p>
+        </div>
+        <div className="flex gap-2">
+          <a href={`/api/requests/export?format=pdf&id=${request.id}`} className="btn-secondary py-1.5">
+            PDF
+          </a>
+          <a href={`/api/requests/export?format=csv&id=${request.id}`} className="btn-secondary py-1.5">
+            CSV
+          </a>
+          <a href={`/api/requests/export?format=xlsx&id=${request.id}`} className="btn-secondary py-1.5">
+            XLSX
+          </a>
+        </div>
       </div>
 
       {/* BR-008: Status and Approval Stage are never merged; Payment/Slot are

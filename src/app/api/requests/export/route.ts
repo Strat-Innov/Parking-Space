@@ -9,10 +9,15 @@ import { handleApiError } from "@/lib/api-helpers";
 import ParkingRequestFormDocument, { type PdfRequestData } from "@/lib/pdf/ParkingRequestFormDocument";
 import { STATUSES, SERVICE_TYPES, type Role } from "@/lib/types";
 
-// Exports exactly the "Other Requests" set from the dashboard (same
-// isActionable exclusion, same role scoping), narrowed by whatever
-// search/status/serviceType the client currently has applied — re-derived
-// from the DB server-side rather than trusting rows already in the browser.
+// Two modes, picked by whether `id` is present:
+//  - id given (the request detail page's own download buttons): exports
+//    exactly that one request, no role/isActionable/filter scoping — if you
+//    can see the page, you can export it.
+//  - id absent (the dashboard's bulk export): exports the "Other Requests"
+//    set (same isActionable exclusion, same role scoping as the page),
+//    narrowed by whatever search/status/serviceType the client currently
+//    has applied. Either way this re-derives from the DB server-side rather
+//    than trusting rows already in the browser.
 export async function GET(req: NextRequest) {
   try {
     const session = await requireSession();
@@ -22,41 +27,58 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "format must be csv, xlsx, or pdf." }, { status: 422 });
     }
 
-    const search = searchParams.get("search")?.trim().toLowerCase() ?? "";
-    const status = searchParams.get("status") ?? "";
-    const serviceType = searchParams.get("serviceType") ?? "";
-    if (status && !STATUSES.includes(status as (typeof STATUSES)[number])) {
-      return NextResponse.json({ error: "Invalid status filter." }, { status: 422 });
+    const singleId = searchParams.get("id");
+
+    let rows;
+    let filenameBase: string;
+
+    if (singleId) {
+      const request = await prisma.parkingRequest.findUnique({
+        where: { id: singleId },
+        include: {
+          preparedBy: { select: { name: true } },
+          validatedBy: { select: { name: true } },
+        },
+      });
+      if (!request) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      rows = [request];
+      filenameBase = `parking-request-${request.id}`;
+    } else {
+      const search = searchParams.get("search")?.trim().toLowerCase() ?? "";
+      const status = searchParams.get("status") ?? "";
+      const serviceType = searchParams.get("serviceType") ?? "";
+      if (status && !STATUSES.includes(status as (typeof STATUSES)[number])) {
+        return NextResponse.json({ error: "Invalid status filter." }, { status: 422 });
+      }
+      if (serviceType && !SERVICE_TYPES.includes(serviceType as (typeof SERVICE_TYPES)[number])) {
+        return NextResponse.json({ error: "Invalid serviceType filter." }, { status: 422 });
+      }
+
+      const role = session.role as Role;
+      const all = await prisma.parkingRequest.findMany({
+        orderBy: { createdAt: "desc" },
+        include: {
+          preparedBy: { select: { name: true } },
+          validatedBy: { select: { name: true } },
+        },
+      });
+
+      rows = all.filter((r) => {
+        if (isActionable(role, r)) return false;
+        if (search && !r.companyName.toLowerCase().includes(search)) return false;
+        if (status && r.status !== status) return false;
+        if (serviceType && r.serviceType !== serviceType) return false;
+        return true;
+      });
+      filenameBase = `parking-requests-${new Date().toISOString().slice(0, 10)}`;
     }
-    if (serviceType && !SERVICE_TYPES.includes(serviceType as (typeof SERVICE_TYPES)[number])) {
-      return NextResponse.json({ error: "Invalid serviceType filter." }, { status: 422 });
-    }
-
-    const role = session.role as Role;
-    const all = await prisma.parkingRequest.findMany({
-      orderBy: { createdAt: "desc" },
-      include: {
-        preparedBy: { select: { name: true } },
-        validatedBy: { select: { name: true } },
-      },
-    });
-
-    const rows = all.filter((r) => {
-      if (isActionable(role, r)) return false;
-      if (search && !r.companyName.toLowerCase().includes(search)) return false;
-      if (status && r.status !== status) return false;
-      if (serviceType && r.serviceType !== serviceType) return false;
-      return true;
-    });
-
-    const stamp = new Date().toISOString().slice(0, 10);
 
     if (format === "csv") {
       const csv = toCsv(rows);
       return new NextResponse(csv, {
         headers: {
           "Content-Type": "text/csv; charset=utf-8",
-          "Content-Disposition": `attachment; filename="parking-requests-${stamp}.csv"`,
+          "Content-Disposition": `attachment; filename="${filenameBase}.csv"`,
         },
       });
     }
@@ -66,7 +88,7 @@ export async function GET(req: NextRequest) {
       return new NextResponse(new Uint8Array(buffer), {
         headers: {
           "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          "Content-Disposition": `attachment; filename="parking-requests-${stamp}.xlsx"`,
+          "Content-Disposition": `attachment; filename="${filenameBase}.xlsx"`,
         },
       });
     }
@@ -104,7 +126,7 @@ export async function GET(req: NextRequest) {
     return new NextResponse(new Uint8Array(buffer), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="parking-requests-${stamp}.pdf"`,
+        "Content-Disposition": `attachment; filename="${filenameBase}.pdf"`,
       },
     });
   } catch (err) {
