@@ -48,7 +48,10 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
     if (session) {
-      return NextResponse.json({ error: "Submit a new parking request via the public request form." }, { status: 403 });
+      return NextResponse.json(
+        { error: "You're logged in as staff — log out (or use a private window) to submit as a guest requestor." },
+        { status: 403 }
+      );
     }
 
     const body = await req.json().catch(() => null);
