@@ -137,8 +137,8 @@ function LoginForm() {
 
   return (
     <div className="mx-auto max-w-md">
-      <h1 className="mb-1 text-2xl font-semibold tracking-tight">Parking Space</h1>
-      <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">Parking Space Request Automation — sign in</p>
+      <h1 className="mb-1 text-2xl font-semibold tracking-tight">ParkServe</h1>
+      <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">Parking Request & Access Management Portal</p>
 
       {justVerified && (
         <p className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-400">
