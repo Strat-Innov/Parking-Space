@@ -19,8 +19,20 @@ function getClient(): Resend {
 // EMAIL_FROM once a real domain is verified in the Resend dashboard.
 const FROM = process.env.EMAIL_FROM ?? "Parking Pro Inc. <onboarding@resend.dev>";
 
+// The Resend SDK does NOT throw on a rejected send (e.g. unverified sending
+// domain, invalid recipient) — it resolves with { error } instead. Every
+// caller in this file needs that surfaced as a real error, not a silent
+// success, so callers (invite/signup routes) can correctly report failures
+// instead of claiming "sent" when nothing went out.
+async function send(params: Parameters<Resend["emails"]["send"]>[0]) {
+  const { error } = await getClient().emails.send(params);
+  if (error) {
+    throw new Error(`Resend rejected the email: ${error.message}`);
+  }
+}
+
 export async function sendConfirmationEmail(to: string, name: string, confirmUrl: string) {
-  await getClient().emails.send({
+  await send({
     from: FROM,
     to,
     subject: "Confirm your Parking Space account",
@@ -34,7 +46,7 @@ export async function sendConfirmationEmail(to: string, name: string, confirmUrl
 }
 
 export async function sendInviteEmail(to: string, name: string, role: Role, acceptUrl: string) {
-  await getClient().emails.send({
+  await send({
     from: FROM,
     to,
     subject: "You've been invited to Parking Space",
