@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { ROLE_LABELS, type Role } from "@/lib/types";
+import { usePathname } from "next/navigation";
+import { type Role } from "@/lib/types";
 import ThemeToggle from "@/components/ThemeToggle";
+import UserMenu from "@/components/UserMenu";
 
 // Same roles as Rate Table maintenance access (Section 7) — the roles that
 // actually touch slot assignment or the requests feeding it.
@@ -11,18 +12,11 @@ const PARKING_LOCATION_ROLES: Role[] = ["PARKING_MANAGEMENT", "PREPARED_BY", "VA
 const LINK_CLASS = "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100";
 
 export default function Nav({ name, role }: { name: string; role: Role }) {
-  const router = useRouter();
   const pathname = usePathname();
   // Same staff accounts work both systems (see login page) — this is just
   // which set of nav links/dashboard is currently showing, not a
   // permission boundary.
   const inAccessSystem = pathname?.startsWith("/access") ?? false;
-
-  async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
-    router.refresh();
-  }
 
   return (
     <header className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
@@ -60,12 +54,7 @@ export default function Nav({ name, role }: { name: string; role: Role }) {
           <span className="text-slate-300 dark:text-slate-700">|</span>
           <ThemeToggle />
           <span className="text-slate-300 dark:text-slate-700">|</span>
-          <span className="text-slate-600 dark:text-slate-400">
-            {name} <span className="text-slate-400 dark:text-slate-500">({ROLE_LABELS[role]})</span>
-          </span>
-          <button onClick={logout} className="btn-secondary py-1.5">
-            Log out
-          </button>
+          <UserMenu name={name} role={role} />
         </nav>
       </div>
     </header>

@@ -11,6 +11,11 @@
 export const ROLES = ["REQUESTER", "PREPARED_BY", "VALIDATED_BY", "PARKING_MANAGEMENT"] as const;
 export type Role = (typeof ROLES)[number];
 
+// The roles a new account can actually be created as — every login-capable
+// role except REQUESTER, which only ever exists as an auto-created guest
+// row (see src/lib/guest.ts) and is blocked from logging in entirely.
+export const STAFF_ROLES = ["PREPARED_BY", "VALIDATED_BY", "PARKING_MANAGEMENT"] as const;
+
 export const SERVICE_TYPES = ["Hourly", "Daily", "Monthly"] as const;
 export type ServiceType = (typeof SERVICE_TYPES)[number];
 
