@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 type System = "space" | "access";
 
@@ -81,6 +82,13 @@ export default function LoginPage() {
           {loading ? "Signing in..." : "Sign in"}
         </button>
       </form>
+
+      <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+        New staff member?{" "}
+        <Link href="/signup" className="underline hover:text-slate-900 dark:hover:text-slate-100">
+          Create an account
+        </Link>
+      </p>
     </div>
   );
 }
