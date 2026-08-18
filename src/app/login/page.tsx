@@ -3,19 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-const DEMO_ACCOUNTS = [
-  { label: "Prepared By", email: "prepared@parking.local" },
-  { label: "Validated By", email: "validator@parking.local" },
-  { label: "Parking Management", email: "parkingmgmt@parking.local" },
-];
-
 type System = "space" | "access";
 
 export default function LoginPage() {
   const router = useRouter();
   const [system, setSystem] = useState<System>("space");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("demo1234");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -87,24 +81,6 @@ export default function LoginPage() {
           {loading ? "Signing in..." : "Sign in"}
         </button>
       </form>
-
-      <div className="mt-6 text-xs text-slate-500 dark:text-slate-400">
-        <p className="mb-2 font-medium text-slate-600 dark:text-slate-300">Demo accounts (password: demo1234)</p>
-        <ul className="space-y-1">
-          {DEMO_ACCOUNTS.map((a) => (
-            <li key={a.email}>
-              <button
-                type="button"
-                className="underline hover:text-slate-900 dark:hover:text-slate-100"
-                onClick={() => setEmail(a.email)}
-              >
-                {a.label}
-              </button>{" "}
-              — {a.email}
-            </li>
-          ))}
-        </ul>
-      </div>
     </div>
   );
 }
