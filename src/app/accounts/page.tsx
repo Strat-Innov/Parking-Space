@@ -5,6 +5,7 @@ import CreateAccountForm from "@/components/CreateAccountForm";
 import InviteStaffForm from "@/components/InviteStaffForm";
 import AccountActivateAction from "@/components/AccountActivateAction";
 import AccountDeactivateAction from "@/components/AccountDeactivateAction";
+import AccountDeleteAction from "@/components/AccountDeleteAction";
 import { ROLE_LABELS, STAFF_ROLES, type Role } from "@/lib/types";
 
 function accountStatus(a: { active: boolean; emailVerifiedAt: Date | null; hasPassword: boolean }) {
@@ -31,7 +32,8 @@ export default async function AccountsPage() {
         <p className="text-sm text-slate-500 dark:text-slate-400">
           Any staff member can add a new account for a coworker, either directly with a temporary password or by
           emailing an invite link.
-          {isDeveloper && " As a Developer, you can also deactivate or reactivate accounts below."}
+          {isDeveloper &&
+            " As a Developer, you can also deactivate/reactivate accounts, or permanently delete ones that have no request history."}
         </p>
       </div>
 
@@ -75,6 +77,7 @@ export default async function AccountsPage() {
                       {isDeveloper && (status === "Active" || status === "Disabled") && a.id !== session.sub && (
                         <AccountDeactivateAction id={a.id} active={a.active} />
                       )}
+                      {isDeveloper && a.id !== session.sub && <AccountDeleteAction id={a.id} name={a.name} />}
                     </span>
                   </td>
                 </tr>

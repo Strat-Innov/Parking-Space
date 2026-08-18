@@ -10,6 +10,7 @@ import PaymentConfirmForm from "@/components/PaymentConfirmForm";
 import SlotAssignForm from "@/components/SlotAssignForm";
 import CancelRequestAction from "@/components/CancelRequestAction";
 import RevertPhaseAction from "@/components/RevertPhaseAction";
+import DeleteRequestAction from "@/components/DeleteRequestAction";
 import DownloadMenu from "@/components/DownloadMenu";
 import type { Role } from "@/lib/types";
 
@@ -253,6 +254,7 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
 
       <RevertPhaseAction requestId={request.id} status={request.status} role={session.role as Role} />
       <CancelRequestAction requestId={request.id} status={request.status} role={session.role as Role} />
+      <DeleteRequestAction requestId={request.id} role={session.role as Role} />
     </div>
   );
 }
