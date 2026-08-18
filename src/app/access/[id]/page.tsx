@@ -75,7 +75,7 @@ export default async function AccessRequestDetailPage({ params }: { params: Prom
       </div>
 
       <div className="card">
-        <h2 className="mb-4 text-lg font-semibold tracking-tight">Validation of Document &amp; Access Endorsement (AWF02)</h2>
+        <h2 className="mb-4 text-lg font-semibold tracking-tight">Validation of Document &amp; Access Endorsement</h2>
         {canProcess ? (
           <AccessProcessForm requestId={request.id} defaultQuantity={request.requestedQuantity} />
         ) : (
@@ -95,7 +95,7 @@ export default async function AccessRequestDetailPage({ params }: { params: Prom
       </div>
 
       <div className="card">
-        <h2 className="mb-4 text-lg font-semibold tracking-tight">Client Receipt Confirmation (AWF03)</h2>
+        <h2 className="mb-4 text-lg font-semibold tracking-tight">Client Receipt Confirmation</h2>
         {canComplete ? (
           <AccessCompleteForm requestId={request.id} />
         ) : (

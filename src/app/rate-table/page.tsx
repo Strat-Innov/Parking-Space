@@ -24,7 +24,7 @@ export default async function RateTablePage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Rate Table</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          Append-only reference list. WF03 snapshots the effective rate onto a request at the moment of approval.
+          Append-only reference list. The effective rate is snapshotted onto a request at the moment of approval.
         </p>
       </div>
 

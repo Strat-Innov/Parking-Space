@@ -20,7 +20,6 @@ export default function Timeline({ events }: { events: Event[] }) {
           <li key={e.id} className="relative">
             <span className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-slate-400 dark:bg-slate-600" />
             <div className="text-sm">
-              <span className="font-mono text-xs text-slate-400 dark:text-slate-500">{e.workflow}</span>{" "}
               {e.fromStatus && e.toStatus ? (
                 <span>
                   <span className="text-slate-500 dark:text-slate-400">{e.fromStatus}</span> {"->"}{" "}

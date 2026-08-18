@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ROLE_LABELS, type Role } from "@/lib/types";
+import PasswordInput from "@/components/PasswordInput";
 
 type System = "space" | "access";
 
@@ -185,11 +186,11 @@ function LoginForm() {
       <form onSubmit={onSubmit} className="card space-y-4">
         <div className="field">
           <label>Email</label>
-          <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@parking.local" />
+          <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@parkingproinc.com" />
         </div>
         <div className="field">
           <label>Password</label>
-          <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+          <PasswordInput required value={password} onChange={(e) => setPassword(e.target.value)} />
         </div>
         {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         {unconfirmed && (

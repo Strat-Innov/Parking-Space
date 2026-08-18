@@ -378,8 +378,8 @@ export default function RequestDetailsForm({
         </div>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
           {form.serviceType === "Monthly"
-            ? "Start must be a later calendar day than today, and End at least 1 month after Start (BR-001/BR-002)."
-            : "Start must be a later calendar day than today (BR-001/BR-002 — no backdating, no same-day requests)."}
+            ? "Start must be a later calendar day than today, and End at least 1 month after Start."
+            : "Start must be a later calendar day than today — no backdating, no same-day requests."}
         </p>
       </div>
 

@@ -40,7 +40,7 @@ export default function AccessCompleteForm({ requestId }: { requestId: string })
       </div>
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       <button type="submit" disabled={loading} className="btn-primary">
-        {loading ? "Saving..." : "Confirm Received (AWF03)"}
+        {loading ? "Saving..." : "Confirm Received"}
       </button>
     </form>
   );

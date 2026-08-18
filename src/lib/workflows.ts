@@ -110,7 +110,7 @@ function validateIntakeFields(input: SubmitRequestInput, dateOfRequest: Date) {
   // Compare start-of-day so BR-002 holds regardless of what time is picked.
   if (startOfDay(input.requiredStartDate) <= startOfDay(dateOfRequest)) {
     throw new WorkflowError(
-      "Required Start Date must be on a later calendar day than the date of request (BR-001/BR-002 — no backdating, no same-day requests).",
+      "Required Start Date must be on a later calendar day than the date of request — no backdating, no same-day requests.",
       422
     );
   }
@@ -219,7 +219,7 @@ export async function wf02EndorseForValidation(requestId: string, actor: Session
   return prisma.$transaction(async (tx) => {
     const req = await tx.parkingRequest.findUniqueOrThrow({ where: { id: requestId } });
     if (req.status !== "In Preparation") {
-      throw new WorkflowError(`WF02 requires Status = "In Preparation" (current: "${req.status}").`, 409);
+      throw new WorkflowError(`Requires Status = "In Preparation" (current: "${req.status}").`, 409);
     }
     const updated = await tx.parkingRequest.update({
       where: { id: requestId },
@@ -243,7 +243,7 @@ export async function wf03Decide(
   return prisma.$transaction(async (tx) => {
     const req = await tx.parkingRequest.findUniqueOrThrow({ where: { id: requestId } });
     if (req.status !== "Pending Approval") {
-      throw new WorkflowError(`WF03 requires Status = "Pending Approval" (current: "${req.status}").`, 409);
+      throw new WorkflowError(`Requires Status = "Pending Approval" (current: "${req.status}").`, 409);
     }
 
     const now = new Date();
@@ -335,7 +335,7 @@ export async function wf04ConfirmPayment(
 
   return prisma.$transaction(async (tx) => {
     const req = await tx.parkingRequest.findUniqueOrThrow({ where: { id: requestId } });
-    if (req.status !== "Approved") throw new WorkflowError('WF04 requires Status = "Approved".', 409);
+    if (req.status !== "Approved") throw new WorkflowError('Requires Status = "Approved".', 409);
     if (req.paymentStatus === "Confirmed") throw new WorkflowError("Payment already confirmed.", 409);
 
     await tx.parkingRequest.update({
@@ -402,7 +402,7 @@ export async function wf05AssignSlot(requestId: string, actor: SessionPayload, p
 
   return prisma.$transaction(async (tx) => {
     const req = await tx.parkingRequest.findUniqueOrThrow({ where: { id: requestId } });
-    if (req.status !== "Approved") throw new WorkflowError('WF05 requires Status = "Approved".', 409);
+    if (req.status !== "Approved") throw new WorkflowError('Requires Status = "Approved".', 409);
     if (req.slotStatus === "Assigned") throw new WorkflowError("A slot is already assigned.", 409);
 
     const space = await tx.parkingSpace.findUnique({ where: { id: parkingSpaceId } });

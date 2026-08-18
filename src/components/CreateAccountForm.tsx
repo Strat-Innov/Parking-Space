@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ROLE_LABELS, STAFF_ROLES } from "@/lib/types";
+import PasswordInput from "@/components/PasswordInput";
 
 export default function CreateAccountForm({ allowDeveloperRole = false }: { allowDeveloperRole?: boolean }) {
   const roleOptions = allowDeveloperRole ? [...STAFF_ROLES, "DEVELOPER" as const] : STAFF_ROLES;
@@ -50,15 +51,14 @@ export default function CreateAccountForm({ allowDeveloperRole = false }: { allo
             required
             value={form.email}
             onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-            placeholder="name@parking.local"
+            placeholder="name@parkingproinc.com"
           />
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="field">
           <label>Temporary Password</label>
-          <input
-            type="password"
+          <PasswordInput
             required
             minLength={8}
             value={form.password}

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import PasswordInput from "@/components/PasswordInput";
 
 export default function AccountActivateAction({ id, needsPassword }: { id: string; needsPassword: boolean }) {
   const router = useRouter();
@@ -40,8 +41,7 @@ export default function AccountActivateAction({ id, needsPassword }: { id: strin
 
   return (
     <form onSubmit={activate} className="flex items-center gap-2">
-      <input
-        type="password"
+      <PasswordInput
         required
         minLength={8}
         placeholder="Set a temp password"

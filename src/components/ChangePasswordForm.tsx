@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import PasswordInput from "@/components/PasswordInput";
 
 export default function ChangePasswordForm() {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -43,8 +44,7 @@ export default function ChangePasswordForm() {
       <h3 className="font-medium">Change password</h3>
       <div className="field">
         <label>Current Password</label>
-        <input
-          type="password"
+        <PasswordInput
           required
           value={currentPassword}
           onChange={(e) => setCurrentPassword(e.target.value)}
@@ -52,12 +52,11 @@ export default function ChangePasswordForm() {
       </div>
       <div className="field">
         <label>New Password</label>
-        <input type="password" required minLength={8} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+        <PasswordInput required minLength={8} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
       </div>
       <div className="field">
         <label>Confirm New Password</label>
-        <input
-          type="password"
+        <PasswordInput
           required
           minLength={8}
           value={confirmPassword}

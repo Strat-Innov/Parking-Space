@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import PasswordInput from "@/components/PasswordInput";
 
 type InviteInfo = { name: string; email: string; roleLabel: string };
 
@@ -92,12 +93,11 @@ function AcceptInviteForm() {
       <form onSubmit={onSubmit} className="card space-y-4">
         <div className="field">
           <label>Password</label>
-          <input type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
+          <PasswordInput required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
         </div>
         <div className="field">
           <label>Confirm Password</label>
-          <input
-            type="password"
+          <PasswordInput
             required
             minLength={8}
             value={confirmPassword}

@@ -75,7 +75,7 @@ export default async function ParkingLocationsPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Parking Location</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          The physical space inventory Parking Management assigns from (WF05). A space is only locked for the exact
+          The physical space inventory Parking Management assigns from. A space is only locked for the exact
           date range it&apos;s booked — &quot;Occupied now&quot; just reflects this moment, not a permanent state.
         </p>
       </div>

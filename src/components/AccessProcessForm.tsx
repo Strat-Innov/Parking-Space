@@ -78,7 +78,7 @@ export default function AccessProcessForm({ requestId, defaultQuantity }: { requ
       </div>
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       <button type="submit" disabled={loading} className="btn-primary">
-        {loading ? "Saving..." : "Validate & Endorse (AWF02)"}
+        {loading ? "Saving..." : "Validate & Endorse"}
       </button>
     </form>
   );

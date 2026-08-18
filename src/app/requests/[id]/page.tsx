@@ -208,7 +208,7 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
 
       <div className="grid gap-6 sm:grid-cols-2">
         <div className="card">
-          <h2 className="mb-4 text-lg font-semibold tracking-tight">Payment Track (WF04)</h2>
+          <h2 className="mb-4 text-lg font-semibold tracking-tight">Payment Track</h2>
           <dl className="mb-4 space-y-3">
             <Field
               label="Rate Snapshot"
@@ -231,7 +231,7 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
           )}
         </div>
         <div className="card">
-          <h2 className="mb-4 text-lg font-semibold tracking-tight">Slot Track (WF05)</h2>
+          <h2 className="mb-4 text-lg font-semibold tracking-tight">Slot Track</h2>
           {canAssignSlot ? (
             <SlotAssignForm
               requestId={request.id}

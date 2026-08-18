@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import PasswordInput from "@/components/PasswordInput";
 
 export default function SignupPage() {
   const [form, setForm] = useState({ name: "", email: "", password: "" });
@@ -75,8 +76,7 @@ export default function SignupPage() {
         </div>
         <div className="field">
           <label>Password</label>
-          <input
-            type="password"
+          <PasswordInput
             required
             minLength={8}
             value={form.password}
@@ -85,8 +85,7 @@ export default function SignupPage() {
         </div>
         <div className="field">
           <label>Confirm Password</label>
-          <input
-            type="password"
+          <PasswordInput
             required
             minLength={8}
             value={confirmPassword}

@@ -12,10 +12,7 @@ export default async function NewRequestPage() {
   return (
     <div className="mx-auto max-w-2xl">
       <RequestTypeLinks current="space" />
-      <h1 className="mb-1 text-2xl font-semibold tracking-tight">New Parking Request</h1>
-      <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">
-        Date of Request is set automatically on submission (BR-003) — you can&apos;t back-date or edit it.
-      </p>
+      <h1 className="mb-6 text-2xl font-semibold tracking-tight">New Parking Request</h1>
       {session ? (
         <div className="card mb-6 border-amber-300 bg-amber-50 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
           You&apos;re logged in as {ROLE_LABELS[session.role as Role]} ({session.email}). Staff accounts can&apos;t

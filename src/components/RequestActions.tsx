@@ -79,7 +79,7 @@ export default function RequestActions({ request, role }: { request: RequestShap
     panels.push(
       <ActionShell
         key="wf03-approve"
-        title="Approve (WF03)"
+        title="Approve"
         loading={loading}
         error={error}
         submitLabel="Approve"
@@ -92,7 +92,7 @@ export default function RequestActions({ request, role }: { request: RequestShap
     panels.push(
       <ActionShell
         key="wf03-reject"
-        title="Reject — returns to In Preparation (WF03, BR-004)"
+        title="Reject — returns to In Preparation"
         loading={loading}
         error={error}
         submitLabel="Reject"

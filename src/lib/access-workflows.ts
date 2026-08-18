@@ -89,7 +89,7 @@ export async function processAccessRequest(requestId: string, actor: SessionPayl
   return prisma.$transaction(async (tx) => {
     const req = await tx.accessRequest.findUniqueOrThrow({ where: { id: requestId } });
     if (req.status !== "Submitted") {
-      throw new WorkflowError(`AWF02 requires Status = "Submitted" (current: "${req.status}").`, 409);
+      throw new WorkflowError(`Requires Status = "Submitted" (current: "${req.status}").`, 409);
     }
 
     const updated = await tx.accessRequest.update({
@@ -121,7 +121,7 @@ export async function completeAccessRequest(requestId: string, actor: SessionPay
   return prisma.$transaction(async (tx) => {
     const req = await tx.accessRequest.findUniqueOrThrow({ where: { id: requestId } });
     if (req.status !== "Processed") {
-      throw new WorkflowError(`AWF03 requires Status = "Processed" (current: "${req.status}").`, 409);
+      throw new WorkflowError(`Requires Status = "Processed" (current: "${req.status}").`, 409);
     }
 
     const updated = await tx.accessRequest.update({
