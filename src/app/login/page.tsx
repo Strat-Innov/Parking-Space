@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { ROLE_LABELS, type Role } from "@/lib/types";
 
 type System = "space" | "access";
 
@@ -21,13 +22,17 @@ function LoginForm() {
   const [unconfirmed, setUnconfirmed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle");
+  // Set once the server says this account holds more than one role — the
+  // form then asks which to act as, using the same credentials already
+  // verified, rather than a separate "second login."
+  const [roleChoices, setRoleChoices] = useState<string[] | null>(null);
+  const [selectedRole, setSelectedRole] = useState<string>("");
 
   const justVerified = searchParams.get("verified") === "1";
   const justAccepted = searchParams.get("accepted") === "1";
   const verifyError = searchParams.get("verifyError");
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function attemptLogin(withRole?: string) {
     setError(null);
     setUnconfirmed(false);
     setLoading(true);
@@ -35,12 +40,17 @@ function LoginForm() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, ...(withRole ? { selectedRole: withRole } : {}) }),
       });
       const data = await res.json();
       if (!res.ok) {
         if (data.unconfirmed) setUnconfirmed(true);
         throw new Error(data.error ?? "Login failed");
+      }
+      if (data.multiRole) {
+        setRoleChoices(data.roles);
+        setSelectedRole(data.roles[0]);
+        return;
       }
       // Same staff accounts work both systems — this only picks which
       // dashboard you land on first, not a separate permission set.
@@ -51,6 +61,16 @@ function LoginForm() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    attemptLogin();
+  }
+
+  function onConfirmRole(e: React.FormEvent) {
+    e.preventDefault();
+    attemptLogin(selectedRole);
   }
 
   async function onResend() {
@@ -64,6 +84,55 @@ function LoginForm() {
     } finally {
       setResendState("sent");
     }
+  }
+
+  if (roleChoices) {
+    return (
+      <div className="mx-auto max-w-md">
+        <h1 className="mb-1 text-2xl font-semibold tracking-tight">Choose Access Point</h1>
+        <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">
+          This account holds more than one role. Pick which one to sign in as — you can sign out and pick a
+          different one later.
+        </p>
+
+        <form onSubmit={onConfirmRole} className="card space-y-4">
+          <div>
+            <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">Role</p>
+            <div className="space-y-2">
+              {roleChoices.map((r) => (
+                <label
+                  key={r}
+                  className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300"
+                >
+                  <input
+                    type="radio"
+                    name="role"
+                    value={r}
+                    checked={selectedRole === r}
+                    onChange={() => setSelectedRole(r)}
+                    className="h-4 w-4 shrink-0"
+                  />
+                  {ROLE_LABELS[r as Role] ?? r}
+                </label>
+              ))}
+            </div>
+          </div>
+          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setRoleChoices(null)}
+              className="btn-secondary flex-1"
+            >
+              Back
+            </button>
+            <button type="submit" disabled={loading} className="btn-primary flex-1">
+              {loading ? "Signing in..." : "Continue"}
+            </button>
+          </div>
+        </form>
+      </div>
+    );
   }
 
   return (

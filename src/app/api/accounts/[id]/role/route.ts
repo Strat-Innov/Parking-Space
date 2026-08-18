@@ -5,7 +5,10 @@ import { prisma } from "@/lib/prisma";
 import { handleApiError } from "@/lib/api-helpers";
 import { ASSIGNABLE_ROLES } from "@/lib/types";
 
-const schema = z.object({ role: z.enum(ASSIGNABLE_ROLES) });
+// Developer is exclusive: it already has its own full admin reach, so it's
+// never combined with the 3 workflow roles (enforced here in addition to
+// the client-side toggle logic in EditRoleAction).
+const schema = z.object({ roles: z.array(z.enum(ASSIGNABLE_ROLES)).min(1) });
 
 // Developer-only. Self-edit is blocked for the same reason as
 // deactivate/delete on your own account — a misclick here (e.g. demoting
@@ -26,13 +29,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: parsed.error.issues.map((i) => i.message).join("; ") }, { status: 422 });
     }
 
+    const roles = Array.from(new Set(parsed.data.roles));
+    if (roles.includes("DEVELOPER") && roles.length > 1) {
+      return NextResponse.json({ error: "Developer can't be combined with other roles." }, { status: 422 });
+    }
+
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user) return NextResponse.json({ error: "Account not found." }, { status: 404 });
 
     const updated = await prisma.user.update({
       where: { id },
-      data: { role: parsed.data.role },
-      select: { id: true, name: true, email: true, role: true },
+      data: { role: roles[0], roles },
+      select: { id: true, name: true, email: true, role: true, roles: true },
     });
     return NextResponse.json({ account: updated });
   } catch (err) {

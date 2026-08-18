@@ -24,6 +24,18 @@ model User {
   role         String // REQUESTER | PREPARED_BY | VALIDATED_BY | PARKING_MANAGEMENT (CASHIER retired — historical rows may still carry it)
   createdAt    DateTime @default(now())
 
+  // The full set of roles this account can log in as — a workaround for
+  // "real" multi-role (one session with combined permissions) that's far
+  // lower-risk: a session still only ever activates ONE role (see `role`
+  // above and login route), so every existing session.role check
+  // throughout the app is untouched. When this has more than one entry,
+  // login shows a picker (same pattern as the login page's System
+  // selector) before creating the session. `role` is the default/primary —
+  // pre-selected in that picker and shown as the primary label in list
+  // views. Empty for any account that predates this (login route falls
+  // back to [role] in that case).
+  roles String[] @default([])
+
   // Email confirmation (self-service /signup only — see src/lib/signup.ts).
   // Accounts added by an existing staff member via /accounts are already
   // vouched for and get emailVerifiedAt set immediately, skipping this.

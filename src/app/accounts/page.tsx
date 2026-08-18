@@ -67,21 +67,28 @@ export default async function AccountsPage() {
                 <tr key={a.id}>
                   <td>{a.name}</td>
                   <td>{a.email}</td>
-                  <td>{ROLE_LABELS[a.role as Role] ?? a.role}</td>
-                  <td>{status}</td>
-                  <td>{new Date(a.createdAt).toLocaleDateString()}</td>
-                  <td>
-                    <span className="flex flex-wrap items-center gap-2">
-                      {status !== "Active" && status !== "Disabled" && (
-                        <AccountActivateAction id={a.id} needsPassword={!a.hasPassword} />
-                      )}
-                      {isDeveloper && (status === "Active" || status === "Disabled") && a.id !== session.sub && (
-                        <AccountDeactivateAction id={a.id} active={a.active} />
-                      )}
-                      {isDeveloper && a.id !== session.sub && <EditRoleAction id={a.id} currentRole={a.role} />}
-                      {isDeveloper && a.id !== session.sub && <AccountDeleteAction id={a.id} name={a.name} />}
-                    </span>
-                  </td>
+                  {(() => {
+                    const roles = a.roles.length ? a.roles : [a.role];
+                    return (
+                      <>
+                        <td>{roles.map((r) => ROLE_LABELS[r as Role] ?? r).join(", ")}</td>
+                        <td>{status}</td>
+                        <td>{new Date(a.createdAt).toLocaleDateString()}</td>
+                        <td>
+                          <span className="flex flex-wrap items-center gap-2">
+                            {status !== "Active" && status !== "Disabled" && (
+                              <AccountActivateAction id={a.id} needsPassword={!a.hasPassword} />
+                            )}
+                            {isDeveloper && (status === "Active" || status === "Disabled") && a.id !== session.sub && (
+                              <AccountDeactivateAction id={a.id} active={a.active} />
+                            )}
+                            {isDeveloper && a.id !== session.sub && <EditRoleAction id={a.id} currentRoles={roles} />}
+                            {isDeveloper && a.id !== session.sub && <AccountDeleteAction id={a.id} name={a.name} />}
+                          </span>
+                        </td>
+                      </>
+                    );
+                  })()}
                 </tr>
               );
             })}
