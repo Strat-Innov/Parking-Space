@@ -31,15 +31,18 @@ export default async function AccountsPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Staff Accounts</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          Any staff member can add a new account for a coworker, either directly with a temporary password or by
-          emailing an invite link.
-          {isDeveloper &&
-            " As a Developer, you can also deactivate/reactivate accounts, or permanently delete ones that have no request history."}
+          {isDeveloper
+            ? "As a Developer, you can add, invite, deactivate/reactivate, edit the role of, or permanently delete (if unused) any staff account."
+            : "Account management is handled by a Developer."}
         </p>
       </div>
 
-      <InviteStaffForm />
-      <CreateAccountForm allowDeveloperRole={isDeveloper} />
+      {isDeveloper && (
+        <>
+          <InviteStaffForm />
+          <CreateAccountForm allowDeveloperRole={isDeveloper} />
+        </>
+      )}
 
       <div className="card table-wrap overflow-x-auto p-0">
         <table>

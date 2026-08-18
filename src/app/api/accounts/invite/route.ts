@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { handleApiError } from "@/lib/api-helpers";
 import { STAFF_ROLES } from "@/lib/types";
@@ -8,11 +8,11 @@ import { createInviteToken, buildAcceptInviteUrl } from "@/lib/emailVerification
 import { sendInviteEmail } from "@/lib/email";
 import { unusablePasswordHash } from "@/lib/password";
 
-// Staff-only bulk invite: rather than the inviter choosing a password (the
-// existing /api/accounts flow), each invitee gets an emailed link to set
-// their own password — see src/app/accept-invite/page.tsx. Same trust model
-// as the direct-create flow (any logged-in staff member, any staff role),
-// so unlike public /signup there's no domain gate and no role restriction.
+// Developer-only bulk invite: rather than the inviter choosing a password
+// (the existing /api/accounts flow), each invitee gets an emailed link to
+// set their own password — see src/app/accept-invite/page.tsx. Unlike
+// public /signup there's no domain gate, but there is a role restriction —
+// only Developer can send invites at all.
 const inviteSchema = z.object({
   invites: z
     .array(
@@ -28,7 +28,7 @@ const inviteSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    await requireSession();
+    await requireRole("DEVELOPER");
     const body = await req.json().catch(() => null);
     const parsed = inviteSchema.safeParse(body);
     if (!parsed.success) {
