@@ -166,8 +166,11 @@ model RateTableEntry {
   rateAmount           Float
   effectiveStartDate    DateTime
   effectiveEndDate      DateTime? // reserved for display use only; see resolution note above
-  createdById            String
-  createdBy              User      @relation("RateCreatedBy", fields: [createdById], references: [id])
+  // Attribution only ("who added this version") — not a workflow
+  // dependency, so it must NOT block deleting the creator's account.
+  // Nulled out (not blocked) by /api/accounts/[id]/delete.
+  createdById            String?
+  createdBy              User?      @relation("RateCreatedBy", fields: [createdById], references: [id])
   createdAt               DateTime  @default(now())
 
   requests ParkingRequest[]
@@ -186,8 +189,11 @@ model ParkingSpace {
   location    String
   slotNumber  String
   isActive    Boolean  @default(true)
-  createdById String
-  createdBy   User     @relation("ParkingSpaceCreatedBy", fields: [createdById], references: [id])
+  // Attribution only ("who added this slot") — not a workflow dependency,
+  // so it must NOT block deleting the creator's account. Nulled out (not
+  // blocked) by /api/accounts/[id]/delete.
+  createdById String?
+  createdBy   User?    @relation("ParkingSpaceCreatedBy", fields: [createdById], references: [id])
   createdAt   DateTime @default(now())
 
   requests ParkingRequest[]

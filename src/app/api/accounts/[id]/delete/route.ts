@@ -30,7 +30,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       );
     }
 
-    await prisma.user.delete({ where: { id } });
+    // rateTableEntries/parkingSpaces createdBy is attribution only, not a
+    // workflow dependency (see accountDeletion.ts) — null it out rather
+    // than block the delete on it.
+    await prisma.$transaction([
+      prisma.rateTableEntry.updateMany({ where: { createdById: id }, data: { createdById: null } }),
+      prisma.parkingSpace.updateMany({ where: { createdById: id }, data: { createdById: null } }),
+      prisma.user.delete({ where: { id } }),
+    ]);
     return NextResponse.json({ ok: true });
   } catch (err) {
     return handleApiError(err);

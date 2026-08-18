@@ -66,7 +66,7 @@ export default async function ParkingLocationsPage() {
       nextBooking: next
         ? { company: next.companyName, serviceType: next.serviceType, from: next.requiredStartDate.toISOString() }
         : null,
-      createdByName: s.createdBy.name,
+      createdByName: s.createdBy?.name ?? "—",
     };
   });
 

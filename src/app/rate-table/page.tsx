@@ -57,7 +57,7 @@ export default async function RateTablePage() {
                 <td>{e.chargingModel}</td>
                 <td>{e.rateAmount.toFixed(2)}</td>
                 <td>{new Date(e.effectiveStartDate).toLocaleDateString()}</td>
-                <td>{e.createdBy.name}</td>
+                <td>{e.createdBy?.name ?? "—"}</td>
                 <td className="font-mono text-xs text-slate-400 dark:text-slate-500">{e.id}</td>
                 {isDeveloper && (
                   <td>
