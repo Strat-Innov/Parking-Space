@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type Role } from "@/lib/types";
-import ThemeToggle from "@/components/ThemeToggle";
 import UserMenu from "@/components/UserMenu";
 
 // Same roles as Rate Table maintenance access (Section 7) — the roles that
@@ -51,8 +50,6 @@ export default function Nav({ name, role }: { name: string; role: Role }) {
           <Link href={inAccessSystem ? "/dashboard" : "/access/dashboard"} className={LINK_CLASS}>
             Switch to {inAccessSystem ? "Parking Space" : "Parking Access"}
           </Link>
-          <span className="text-slate-300 dark:text-slate-700">|</span>
-          <ThemeToggle />
           <span className="text-slate-300 dark:text-slate-700">|</span>
           <UserMenu name={name} role={role} />
         </nav>

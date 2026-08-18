@@ -4,10 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ROLE_LABELS, type Role } from "@/lib/types";
+import SettingsModal from "@/components/SettingsModal";
 
 export default function UserMenu({ name, role }: { name: string; role: Role }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -32,6 +34,16 @@ export default function UserMenu({ name, role }: { name: string; role: Role }) {
       </button>
       {open && (
         <div className="absolute right-0 z-20 mt-2 w-52 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+          <button
+            type="button"
+            onClick={() => {
+              setSettingsOpen(true);
+              setOpen(false);
+            }}
+            className="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            Settings
+          </button>
           <Link
             href="/account"
             onClick={() => setOpen(false)}
@@ -55,6 +67,7 @@ export default function UserMenu({ name, role }: { name: string; role: Role }) {
           </button>
         </div>
       )}
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 }
