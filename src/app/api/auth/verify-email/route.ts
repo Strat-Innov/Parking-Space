@@ -15,7 +15,10 @@ export async function GET(req: NextRequest) {
   }
 
   const user = await prisma.user.findUnique({ where: { emailVerificationToken: token } });
-  if (!user || !user.emailVerificationTokenExpiresAt || user.emailVerificationTokenExpiresAt < new Date()) {
+  // hasPassword false means this is actually an invite token (see
+  // schema.prisma) — those are consumed at /accept-invite, which also sets
+  // a real password. Confirming here without one would strand the account.
+  if (!user || !user.hasPassword || !user.emailVerificationTokenExpiresAt || user.emailVerificationTokenExpiresAt < new Date()) {
     loginUrl.searchParams.set("verifyError", "invalid");
     return NextResponse.redirect(loginUrl);
   }

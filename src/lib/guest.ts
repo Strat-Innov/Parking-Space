@@ -1,6 +1,5 @@
-import bcrypt from "bcryptjs";
-import crypto from "crypto";
 import { prisma } from "./prisma";
+import { unusablePasswordHash } from "./password";
 
 // Shared by both public intake forms (/requests/new and /access/new) — an
 // anonymous submission gets a lightweight "guest" User row (found-or-created
@@ -13,9 +12,8 @@ export async function resolveGuestRequesterId(fullName: string, emailAddress: st
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) return existing.id;
 
-  const unusablePasswordHash = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 10);
   const created = await prisma.user.create({
-    data: { name: fullName, email, role: "REQUESTER", passwordHash: unusablePasswordHash },
+    data: { name: fullName, email, role: "REQUESTER", passwordHash: await unusablePasswordHash() },
   });
   return created.id;
 }

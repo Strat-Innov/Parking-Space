@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { handleApiError } from "@/lib/api-helpers";
-import { createVerificationToken, buildConfirmUrl } from "@/lib/emailVerification";
-import { sendConfirmationEmail } from "@/lib/email";
+import { createVerificationToken, createInviteToken, buildConfirmUrl, buildAcceptInviteUrl } from "@/lib/emailVerification";
+import { sendConfirmationEmail, sendInviteEmail } from "@/lib/email";
+import type { Role } from "@/lib/types";
 
 const schema = z.object({ email: z.string().email() });
 
@@ -26,12 +27,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(GENERIC_OK);
     }
 
-    const { token, expiresAt } = createVerificationToken();
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { emailVerificationToken: token, emailVerificationTokenExpiresAt: expiresAt },
-    });
-    await sendConfirmationEmail(email, user.name, buildConfirmUrl(token));
+    // Invited-but-not-accepted accounts (hasPassword false) need a fresh
+    // invite link, not a confirm link — a confirm link would mark them
+    // verified without ever collecting a real password, permanently
+    // stranding the account (see schema.prisma comment on hasPassword).
+    if (user.hasPassword) {
+      const { token, expiresAt } = createVerificationToken();
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { emailVerificationToken: token, emailVerificationTokenExpiresAt: expiresAt },
+      });
+      await sendConfirmationEmail(email, user.name, buildConfirmUrl(token));
+    } else {
+      const { token, expiresAt } = createInviteToken();
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { emailVerificationToken: token, emailVerificationTokenExpiresAt: expiresAt },
+      });
+      await sendInviteEmail(email, user.name, user.role as Role, buildAcceptInviteUrl(token));
+    }
 
     return NextResponse.json(GENERIC_OK);
   } catch (err) {

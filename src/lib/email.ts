@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { ROLE_LABELS, type Role } from "./types";
 
 // Lazily constructed so the app can still build/boot without RESEND_API_KEY
 // set (e.g. local dev before the key is provisioned) — only sending an
@@ -28,6 +29,20 @@ export async function sendConfirmationEmail(to: string, name: string, confirmUrl
       <p>Thanks for signing up for Parking Space Request Automation. Confirm your email address to activate your account:</p>
       <p><a href="${confirmUrl}">Confirm my email</a></p>
       <p>This link expires in 24 hours. If you didn't create this account, you can ignore this email.</p>
+    `,
+  });
+}
+
+export async function sendInviteEmail(to: string, name: string, role: Role, acceptUrl: string) {
+  await getClient().emails.send({
+    from: FROM,
+    to,
+    subject: "You've been invited to Parking Space",
+    html: `
+      <p>Hi ${escapeHtml(name)},</p>
+      <p>A colleague has set up a Parking Space Request Automation account for you as <strong>${escapeHtml(ROLE_LABELS[role])}</strong>. Set your password to activate it:</p>
+      <p><a href="${acceptUrl}">Set my password</a></p>
+      <p>This link expires in 7 days. If you weren't expecting this, you can ignore this email.</p>
     `,
   });
 }

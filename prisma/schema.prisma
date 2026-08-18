@@ -32,6 +32,15 @@ model User {
   emailVerificationToken          String?   @unique
   emailVerificationTokenExpiresAt DateTime?
 
+  // false only between a staff-sent invite (POST /api/accounts/invite,
+  // passwordHash is an unusable placeholder) and the invitee accepting it
+  // (POST /api/auth/accept-invite, which flips this true). Distinguishes an
+  // invited-but-not-accepted row from a self-signup-unconfirmed row — both
+  // have emailVerifiedAt null, but need different "resend" emails (see
+  // /api/auth/resend-confirmation): an invite link (sets a real password)
+  // vs a confirm link (assumes a real password already exists).
+  hasPassword Boolean @default(true)
+
   requestsSubmitted ParkingRequest[] @relation("Requester")
   requestsPrepared  ParkingRequest[] @relation("PreparedBy")
   requestsValidated ParkingRequest[] @relation("ValidatedBy")

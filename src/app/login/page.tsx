@@ -23,6 +23,7 @@ function LoginForm() {
   const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle");
 
   const justVerified = searchParams.get("verified") === "1";
+  const justAccepted = searchParams.get("accepted") === "1";
   const verifyError = searchParams.get("verifyError");
 
   async function onSubmit(e: React.FormEvent) {
@@ -73,6 +74,11 @@ function LoginForm() {
       {justVerified && (
         <p className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-400">
           Email confirmed — you can now sign in.
+        </p>
+      )}
+      {justAccepted && (
+        <p className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-400">
+          Your account is active — sign in with your new password.
         </p>
       )}
       {verifyError && !justVerified && (
