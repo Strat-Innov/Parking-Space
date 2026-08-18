@@ -8,7 +8,7 @@ import UserMenu from "@/components/UserMenu";
 
 // Same roles as Rate Table maintenance access (Section 7) — the roles that
 // actually touch slot assignment or the requests feeding it.
-const PARKING_LOCATION_ROLES: Role[] = ["PARKING_MANAGEMENT", "PREPARED_BY", "VALIDATED_BY"];
+const PARKING_LOCATION_ROLES: Role[] = ["PARKING_MANAGEMENT", "PREPARED_BY", "VALIDATED_BY", "DEVELOPER"];
 const LINK_CLASS = "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100";
 
 export default function Nav({ name, role }: { name: string; role: Role }) {

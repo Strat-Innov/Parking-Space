@@ -2,9 +2,10 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import RateTableForm from "@/components/RateTableForm";
+import DeleteRateEntryAction from "@/components/DeleteRateEntryAction";
 import type { Role } from "@/lib/types";
 
-const MAINTAINERS: Role[] = ["PARKING_MANAGEMENT", "PREPARED_BY", "VALIDATED_BY"];
+const MAINTAINERS: Role[] = ["PARKING_MANAGEMENT", "PREPARED_BY", "VALIDATED_BY", "DEVELOPER"];
 
 export default async function RateTablePage() {
   const session = await getSession();
@@ -16,6 +17,7 @@ export default async function RateTablePage() {
   });
 
   const canMaintain = MAINTAINERS.includes(session.role as Role);
+  const isDeveloper = session.role === "DEVELOPER";
 
   return (
     <div className="space-y-6">
@@ -38,12 +40,13 @@ export default async function RateTablePage() {
               <th>Effective Start</th>
               <th>Added By</th>
               <th>Version ID</th>
+              {isDeveloper && <th></th>}
             </tr>
           </thead>
           <tbody>
             {entries.length === 0 && (
               <tr>
-                <td colSpan={6} className="py-8 text-center text-slate-400 dark:text-slate-500">
+                <td colSpan={isDeveloper ? 7 : 6} className="py-8 text-center text-slate-400 dark:text-slate-500">
                   No rate versions configured yet.
                 </td>
               </tr>
@@ -56,6 +59,11 @@ export default async function RateTablePage() {
                 <td>{new Date(e.effectiveStartDate).toLocaleDateString()}</td>
                 <td>{e.createdBy.name}</td>
                 <td className="font-mono text-xs text-slate-400 dark:text-slate-500">{e.id}</td>
+                {isDeveloper && (
+                  <td>
+                    <DeleteRateEntryAction id={e.id} />
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

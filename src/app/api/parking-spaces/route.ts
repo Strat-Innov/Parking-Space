@@ -6,7 +6,9 @@ import { handleApiError } from "@/lib/api-helpers";
 
 // Same maintenance access as the Rate Table (Section 7): Parking Management,
 // Prepared By, and Validated By can all add or remove a parking space.
-const MAINTAINERS = ["PARKING_MANAGEMENT", "PREPARED_BY", "VALIDATED_BY"] as const;
+// DEVELOPER also gets add access (not just the hard-delete capability in
+// [id]/delete/route.ts) so cleanup work doesn't require switching accounts.
+const MAINTAINERS = ["PARKING_MANAGEMENT", "PREPARED_BY", "VALIDATED_BY", "DEVELOPER"] as const;
 
 const createSchema = z.object({
   location: z.string().min(1),

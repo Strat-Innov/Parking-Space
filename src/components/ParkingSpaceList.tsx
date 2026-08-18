@@ -28,15 +28,19 @@ function LocationModal({
   location,
   slots,
   canMaintain,
+  isDeveloper,
   busyId,
   onRemove,
+  onDelete,
   onClose,
 }: {
   location: string;
   slots: ParkingSpaceRow[];
   canMaintain: boolean;
+  isDeveloper: boolean;
   busyId: string | null;
   onRemove: (id: string) => void;
+  onDelete: (id: string) => void;
   onClose: () => void;
 }) {
   const [query, setQuery] = useState("");
@@ -135,6 +139,16 @@ function LocationModal({
                   {busyId === s.id ? "Removing..." : "Remove"}
                 </button>
               )}
+              {isDeveloper && (
+                <button
+                  type="button"
+                  disabled={busyId === s.id}
+                  onClick={() => onDelete(s.id)}
+                  className="text-xs font-medium text-red-600 underline hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                >
+                  {busyId === s.id ? "..." : "Delete Permanently"}
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -143,7 +157,15 @@ function LocationModal({
   );
 }
 
-export default function ParkingSpaceList({ rows, canMaintain }: { rows: ParkingSpaceRow[]; canMaintain: boolean }) {
+export default function ParkingSpaceList({
+  rows,
+  canMaintain,
+  isDeveloper = false,
+}: {
+  rows: ParkingSpaceRow[];
+  canMaintain: boolean;
+  isDeveloper?: boolean;
+}) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -161,6 +183,22 @@ export default function ParkingSpaceList({ rows, canMaintain }: { rows: ParkingS
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to remove parking space");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function onDelete(id: string) {
+    if (!confirm("Permanently delete this parking space? This cannot be undone.")) return;
+    setError(null);
+    setBusyId(id);
+    try {
+      const res = await fetch(`/api/parking-spaces/${id}/delete`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to delete parking space");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete parking space");
     } finally {
       setBusyId(null);
     }
@@ -246,8 +284,10 @@ export default function ParkingSpaceList({ rows, canMaintain }: { rows: ParkingS
           location={openLocation}
           slots={openLocationSlots}
           canMaintain={canMaintain}
+          isDeveloper={isDeveloper}
           busyId={busyId}
           onRemove={onRemove}
+          onDelete={onDelete}
           onClose={() => setOpenLocation(null)}
         />
       )}

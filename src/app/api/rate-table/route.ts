@@ -6,8 +6,10 @@ import { handleApiError } from "@/lib/api-helpers";
 import { SERVICE_TYPES } from "@/lib/types";
 
 // Section 7: "Parking Management, Prepared By, and Validated By all have
-// edit access to the Rate Table list."
-const MAINTAINERS = ["PARKING_MANAGEMENT", "PREPARED_BY", "VALIDATED_BY"] as const;
+// edit access to the Rate Table list." DEVELOPER also gets add access here
+// (not just the delete capability in [id]/delete/route.ts) so cleanup work
+// doesn't require switching accounts.
+const MAINTAINERS = ["PARKING_MANAGEMENT", "PREPARED_BY", "VALIDATED_BY", "DEVELOPER"] as const;
 
 const createSchema = z.object({
   serviceType: z.enum(SERVICE_TYPES),

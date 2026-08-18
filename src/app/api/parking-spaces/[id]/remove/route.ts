@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { handleApiError } from "@/lib/api-helpers";
 import { WorkflowError } from "@/lib/workflows";
 
-const MAINTAINERS = ["PARKING_MANAGEMENT", "PREPARED_BY", "VALIDATED_BY"] as const;
+const MAINTAINERS = ["PARKING_MANAGEMENT", "PREPARED_BY", "VALIDATED_BY", "DEVELOPER"] as const;
 
 // Soft delete — never hard-removed, so a past request's parkingSpaceId stays
 // valid. Blocked if the space has a current or upcoming booking; a space

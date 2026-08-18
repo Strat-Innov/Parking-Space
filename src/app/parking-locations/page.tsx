@@ -5,7 +5,7 @@ import ParkingSpaceForm from "@/components/ParkingSpaceForm";
 import ParkingSpaceList from "@/components/ParkingSpaceList";
 import type { Role } from "@/lib/types";
 
-const MAINTAINERS: Role[] = ["PARKING_MANAGEMENT", "PREPARED_BY", "VALIDATED_BY"];
+const MAINTAINERS: Role[] = ["PARKING_MANAGEMENT", "PREPARED_BY", "VALIDATED_BY", "DEVELOPER"];
 
 export default async function ParkingLocationsPage() {
   const session = await getSession();
@@ -82,7 +82,7 @@ export default async function ParkingLocationsPage() {
 
       {canMaintain && <ParkingSpaceForm />}
 
-      <ParkingSpaceList rows={rows} canMaintain={canMaintain} />
+      <ParkingSpaceList rows={rows} canMaintain={canMaintain} isDeveloper={session.role === "DEVELOPER"} />
     </div>
   );
 }
