@@ -1,4 +1,4 @@
-# Parking Space Request Automation
+# Parking Pro Inc. Request Automation
 
 A working implementation of the frozen architecture in
 [`ARCHITECTURE.md`](./ARCHITECTURE.md) (`Parking_Request_Architecture_Revised.md`):
