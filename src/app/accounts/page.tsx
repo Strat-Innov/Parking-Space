@@ -4,9 +4,11 @@ import { prisma } from "@/lib/prisma";
 import CreateAccountForm from "@/components/CreateAccountForm";
 import InviteStaffForm from "@/components/InviteStaffForm";
 import AccountActivateAction from "@/components/AccountActivateAction";
+import AccountDeactivateAction from "@/components/AccountDeactivateAction";
 import { ROLE_LABELS, STAFF_ROLES, type Role } from "@/lib/types";
 
-function accountStatus(a: { emailVerifiedAt: Date | null; hasPassword: boolean }) {
+function accountStatus(a: { active: boolean; emailVerifiedAt: Date | null; hasPassword: boolean }) {
+  if (!a.active) return "Disabled";
   if (a.emailVerifiedAt) return "Active";
   if (!a.hasPassword) return "Invited (pending)";
   return "Unconfirmed";
@@ -15,9 +17,10 @@ function accountStatus(a: { emailVerifiedAt: Date | null; hasPassword: boolean }
 export default async function AccountsPage() {
   const session = await getSession();
   if (!session) redirect("/login");
+  const isDeveloper = session.role === "DEVELOPER";
 
   const accounts = await prisma.user.findMany({
-    where: { role: { in: STAFF_ROLES as unknown as string[] } },
+    where: { role: { in: [...STAFF_ROLES, "DEVELOPER"] as unknown as string[] } },
     orderBy: { createdAt: "desc" },
   });
 
@@ -28,11 +31,12 @@ export default async function AccountsPage() {
         <p className="text-sm text-slate-500 dark:text-slate-400">
           Any staff member can add a new account for a coworker, either directly with a temporary password or by
           emailing an invite link.
+          {isDeveloper && " As a Developer, you can also deactivate or reactivate accounts below."}
         </p>
       </div>
 
       <InviteStaffForm />
-      <CreateAccountForm />
+      <CreateAccountForm allowDeveloperRole={isDeveloper} />
 
       <div className="card table-wrap overflow-x-auto p-0">
         <table>
@@ -64,7 +68,14 @@ export default async function AccountsPage() {
                   <td>{status}</td>
                   <td>{new Date(a.createdAt).toLocaleDateString()}</td>
                   <td>
-                    {status !== "Active" && <AccountActivateAction id={a.id} needsPassword={!a.hasPassword} />}
+                    <span className="flex items-center gap-2">
+                      {status !== "Active" && status !== "Disabled" && (
+                        <AccountActivateAction id={a.id} needsPassword={!a.hasPassword} />
+                      )}
+                      {isDeveloper && (status === "Active" || status === "Disabled") && a.id !== session.sub && (
+                        <AccountDeactivateAction id={a.id} active={a.active} />
+                      )}
+                    </span>
                   </td>
                 </tr>
               );

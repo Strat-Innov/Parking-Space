@@ -433,6 +433,94 @@ export async function wf05AssignSlot(requestId: string, actor: SessionPayload, p
   });
 }
 
+// --- Developer-only — revert a request one phase backward --------------------------
+//
+// Only defined for statuses reached via exactly one forward transition:
+// - Pending Approval <- WF02 endorse (from In Preparation), sole source.
+// - Approved <- WF03 approve (from Pending Approval), sole source.
+// - Completed <- WF06 (from Approved), sole source.
+// "In Preparation" is deliberately NOT revertible — it's reachable from two
+// different transitions (WF01's initial routing, and WF03's reject loop),
+// so there's no single well-defined phase to revert TO. "Submitted" is
+// never actually observed at rest (WF01 fires instantly on creation, see
+// its comment above). "Cancelled" is terminal, same as Completed is for the
+// normal forward flow — reverting either isn't in scope here.
+// (REVERTIBLE_STATUSES itself lives in types.ts — RevertPhaseAction, a
+// client component, needs it too, and this file pulls in server-only
+// Prisma code that can't be bundled client-side.)
+
+export async function wfDevRevertPhase(requestId: string, actor: SessionPayload) {
+  if (actor.role !== "DEVELOPER") throw new WorkflowError("Only a Developer can revert a request's phase.", 403);
+
+  return prisma.$transaction(async (tx) => {
+    const req = await tx.parkingRequest.findUniqueOrThrow({ where: { id: requestId } });
+
+    if (req.status === "Pending Approval") {
+      // Undo WF02 (In Preparation -> Pending Approval).
+      const updated = await tx.parkingRequest.update({
+        where: { id: requestId },
+        data: { status: "In Preparation", approvalStage: "Prepared By", preparedById: null },
+      });
+      await logEvent(tx, requestId, "DEV_REVERT", "Pending Approval", "In Preparation", actor.sub, "Reverted 1 phase by Developer");
+      return updated;
+    }
+
+    if (req.status === "Approved") {
+      // Undo WF03 approve (Pending Approval -> Approved). Also strip
+      // anything that's only valid while Approved (BR-006 payment/slot
+      // tracks + the WF03 rate snapshot) — none of it belongs on a request
+      // sitting at Pending Approval.
+      const updated = await tx.parkingRequest.update({
+        where: { id: requestId },
+        data: {
+          status: "Pending Approval",
+          approvalStage: "Validated By",
+          approvalDecision: null,
+          validatedById: null,
+          validatedDate: null,
+          rateVersionId: null,
+          rateAmountSnapshot: null,
+          rateSnapshotDate: null,
+          totalPaymentDue: null,
+          paymentStatus: "Not Started",
+          cashierId: null,
+          payDate: null,
+          officialReceiptReference: null,
+          slotStatus: "Unassigned",
+          assignedSlot: null,
+          parkingSpaceId: null,
+          slotAssignmentDate: null,
+          assignedById: null,
+        },
+      });
+      await logEvent(
+        tx,
+        requestId,
+        "DEV_REVERT",
+        "Approved",
+        "Pending Approval",
+        actor.sub,
+        "Reverted 1 phase by Developer (payment/slot/rate snapshot cleared)"
+      );
+      return updated;
+    }
+
+    if (req.status === "Completed") {
+      // Undo WF06 (Approved -> Completed). Payment/slot stay intact here —
+      // they were legitimately confirmed while Approved; that's exactly
+      // what triggered completion, so there's nothing to unwind.
+      const updated = await tx.parkingRequest.update({
+        where: { id: requestId },
+        data: { status: "Approved", approvalStage: "Post-Approval", completedDate: null },
+      });
+      await logEvent(tx, requestId, "DEV_REVERT", "Completed", "Approved", actor.sub, "Reverted 1 phase by Developer");
+      return updated;
+    }
+
+    throw new WorkflowError(`No previous phase to revert to from status "${req.status}".`, 409);
+  });
+}
+
 // --- Cancellation (reachable from any non-terminal state) -------------------------
 
 export async function cancelRequest(requestId: string, actor: SessionPayload) {

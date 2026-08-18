@@ -8,12 +8,22 @@
 // may still carry the literal string "CASHIER"; that's fine since those are
 // plain strings, not a DB enum, and Timeline displays actor.role verbatim
 // rather than through ROLE_LABELS.
-export const ROLES = ["REQUESTER", "PREPARED_BY", "VALIDATED_BY", "PARKING_MANAGEMENT"] as const;
+// DEVELOPER is a separate admin-style role, not a peer of the 3 workflow
+// roles: it owns account management (deactivate/reactivate — add/invite
+// stays open to any staff member, unchanged) and reverting a request one
+// phase backward (see wf_devRevertPhase in workflows.ts). It does NOT grant
+// the regular WF02/WF03/WF04/WF05/cancel actions — those still check for
+// their own specific role, so a Developer account can view a request but
+// not act on its normal workflow. Deliberately excluded from STAFF_ROLES so
+// it never appears in the public/staff account-creation role dropdowns —
+// granting it is a manual, one-off action, not self-service.
+export const ROLES = ["REQUESTER", "PREPARED_BY", "VALIDATED_BY", "PARKING_MANAGEMENT", "DEVELOPER"] as const;
 export type Role = (typeof ROLES)[number];
 
-// The roles a new account can actually be created as — every login-capable
-// role except REQUESTER, which only ever exists as an auto-created guest
-// row (see src/lib/guest.ts) and is blocked from logging in entirely.
+// The roles a new account can actually be created as — every ordinary
+// login-capable role except REQUESTER, which only ever exists as an
+// auto-created guest row (see src/lib/guest.ts) and is blocked from logging
+// in entirely. DEVELOPER is intentionally not here (see comment above).
 export const STAFF_ROLES = ["PREPARED_BY", "VALIDATED_BY", "PARKING_MANAGEMENT"] as const;
 
 export const SERVICE_TYPES = ["Hourly", "Daily", "Monthly"] as const;
@@ -52,9 +62,17 @@ export const NON_TERMINAL_STATUSES: Status[] = [
   "Approved",
 ];
 
+// Statuses wfDevRevertPhase (workflows.ts) can revert one step backward from
+// — kept here (not workflows.ts) since it's imported by a client component
+// (RevertPhaseAction) and workflows.ts pulls in server-only Prisma code.
+// See wfDevRevertPhase's comment for why exactly these three and not
+// "In Preparation"/"Submitted"/"Cancelled".
+export const REVERTIBLE_STATUSES: Status[] = ["Pending Approval", "Approved", "Completed"];
+
 export const ROLE_LABELS: Record<Role, string> = {
   REQUESTER: "Requestor",
   PREPARED_BY: "Prepared By",
   VALIDATED_BY: "Validated By",
   PARKING_MANAGEMENT: "Parking Management",
+  DEVELOPER: "Developer",
 };

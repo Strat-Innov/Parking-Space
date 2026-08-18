@@ -41,6 +41,13 @@ model User {
   // vs a confirm link (assumes a real password already exists).
   hasPassword Boolean @default(true)
 
+  // Login-capable accounts only — flipped false by a Developer via
+  // /api/accounts/[id]/deactivate. Distinct from deletion: the row (and
+  // every request/event it's attached to) stays intact, only login is
+  // refused. REQUESTER rows never log in regardless, so this has no effect
+  // on them either way.
+  active Boolean @default(true)
+
   requestsSubmitted ParkingRequest[] @relation("Requester")
   requestsPrepared  ParkingRequest[] @relation("PreparedBy")
   requestsValidated ParkingRequest[] @relation("ValidatedBy")

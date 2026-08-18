@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ROLE_LABELS, STAFF_ROLES } from "@/lib/types";
 
-export default function CreateAccountForm() {
+export default function CreateAccountForm({ allowDeveloperRole = false }: { allowDeveloperRole?: boolean }) {
+  const roleOptions = allowDeveloperRole ? [...STAFF_ROLES, "DEVELOPER" as const] : STAFF_ROLES;
   const router = useRouter();
   const [form, setForm] = useState({ name: "", email: "", password: "", role: STAFF_ROLES[0] as string });
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +68,7 @@ export default function CreateAccountForm() {
         <div className="field">
           <label>Role</label>
           <select value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}>
-            {STAFF_ROLES.map((r) => (
+            {roleOptions.map((r) => (
               <option key={r} value={r}>
                 {ROLE_LABELS[r]}
               </option>

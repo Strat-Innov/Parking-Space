@@ -34,6 +34,9 @@ export async function POST(req: NextRequest) {
         { status: 403 },
       );
     }
+    if (!user.active) {
+      return NextResponse.json({ error: "This account has been deactivated." }, { status: 403 });
+    }
 
     await createSession({ sub: user.id, role: user.role as Role, name: user.name, email: user.email });
     return NextResponse.json({ ok: true, role: user.role });

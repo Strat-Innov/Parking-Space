@@ -8,19 +8,23 @@ import { STAFF_ROLES } from "@/lib/types";
 
 // Any logged-in staff member (any of the 3 staff roles) may add a new staff
 // account — there's no separate "admin" role in this app, so this is
-// intentionally not gated beyond requireSession().
+// intentionally not gated beyond requireSession(). DEVELOPER is the one
+// exception: it's a deliberate, sensitive elevation, so only an existing
+// Developer can grant it (checked below, after parsing — zod alone can't
+// see who the actor is).
+const ASSIGNABLE_ROLES = [...STAFF_ROLES, "DEVELOPER"] as const;
 const createSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
   password: z.string().min(8, "Password must be at least 8 characters."),
-  role: z.enum(STAFF_ROLES),
+  role: z.enum(ASSIGNABLE_ROLES),
 });
 
 export async function GET() {
   try {
     await requireSession();
     const accounts = await prisma.user.findMany({
-      where: { role: { in: STAFF_ROLES as unknown as string[] } },
+      where: { role: { in: ASSIGNABLE_ROLES as unknown as string[] } },
       orderBy: { createdAt: "desc" },
       select: { id: true, name: true, email: true, role: true, createdAt: true },
     });
@@ -32,11 +36,14 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    await requireSession();
+    const actor = await requireSession();
     const body = await req.json().catch(() => null);
     const parsed = createSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues.map((i) => i.message).join("; ") }, { status: 422 });
+    }
+    if (parsed.data.role === "DEVELOPER" && actor.role !== "DEVELOPER") {
+      return NextResponse.json({ error: "Only a Developer can grant the Developer role." }, { status: 403 });
     }
 
     const email = parsed.data.email.toLowerCase();
