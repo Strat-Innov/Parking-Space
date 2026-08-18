@@ -24,6 +24,14 @@ model User {
   role         String // REQUESTER | PREPARED_BY | VALIDATED_BY | PARKING_MANAGEMENT (CASHIER retired — historical rows may still carry it)
   createdAt    DateTime @default(now())
 
+  // Email confirmation (self-service /signup only — see src/lib/signup.ts).
+  // Accounts added by an existing staff member via /accounts are already
+  // vouched for and get emailVerifiedAt set immediately, skipping this.
+  // Login is refused while emailVerifiedAt is null.
+  emailVerifiedAt                 DateTime?
+  emailVerificationToken          String?   @unique
+  emailVerificationTokenExpiresAt DateTime?
+
   requestsSubmitted ParkingRequest[] @relation("Requester")
   requestsPrepared  ParkingRequest[] @relation("PreparedBy")
   requestsValidated ParkingRequest[] @relation("ValidatedBy")

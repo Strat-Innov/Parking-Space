@@ -2,14 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 export default function SignupPage() {
-  const router = useRouter();
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -27,12 +26,28 @@ export default function SignupPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to create account");
-      router.push("/login");
+      setSubmitted(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create account");
     } finally {
       setLoading(false);
     }
+  }
+
+  if (submitted) {
+    return (
+      <div className="mx-auto max-w-md">
+        <h1 className="mb-1 text-2xl font-semibold tracking-tight">Check your email</h1>
+        <p className="card mt-4 text-sm text-slate-600 dark:text-slate-300">
+          We sent a confirmation link to <span className="font-medium">{form.email}</span>. Click it to activate
+          your account, then come back to{" "}
+          <Link href="/login" className="underline hover:text-slate-900 dark:hover:text-slate-100">
+            sign in
+          </Link>
+          .
+        </p>
+      </div>
+    );
   }
 
   return (

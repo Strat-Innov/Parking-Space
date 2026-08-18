@@ -46,8 +46,10 @@ export async function POST(req: NextRequest) {
     }
 
     const passwordHash = await bcrypt.hash(parsed.data.password, 10);
+    // Vouched for by the staff member adding them (requireSession above) —
+    // unlike self-service /signup, no separate email confirmation step.
     const account = await prisma.user.create({
-      data: { name: parsed.data.name, email, role: parsed.data.role, passwordHash },
+      data: { name: parsed.data.name, email, role: parsed.data.role, passwordHash, emailVerifiedAt: new Date() },
       select: { id: true, name: true, email: true, role: true, createdAt: true },
     });
     return NextResponse.json({ account }, { status: 201 });

@@ -28,6 +28,12 @@ export async function POST(req: NextRequest) {
     if (user.role === "REQUESTER" || user.role === "CASHIER") {
       return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
     }
+    if (!user.emailVerifiedAt) {
+      return NextResponse.json(
+        { error: "Please confirm your email address before signing in.", unconfirmed: true },
+        { status: 403 },
+      );
+    }
 
     await createSession({ sub: user.id, role: user.role as Role, name: user.name, email: user.email });
     return NextResponse.json({ ok: true, role: user.role });

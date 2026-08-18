@@ -19,7 +19,7 @@ async function main() {
     const created = await prisma.user.upsert({
       where: { email: u.email },
       update: {},
-      create: { name: u.name, email: u.email, role: u.role, passwordHash },
+      create: { name: u.name, email: u.email, role: u.role, passwordHash, emailVerifiedAt: new Date() },
     });
     users[u.role] = created.id;
   }
