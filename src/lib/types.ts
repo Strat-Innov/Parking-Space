@@ -26,6 +26,12 @@ export type Role = (typeof ROLES)[number];
 // in entirely. DEVELOPER is intentionally not here (see comment above).
 export const STAFF_ROLES = ["PREPARED_BY", "VALIDATED_BY", "PARKING_MANAGEMENT"] as const;
 
+// Every role a Developer can assign — via Add Account, Invite, or editing an
+// existing account's role. Same reasoning as STAFF_ROLES excluding
+// REQUESTER; DEVELOPER is included here (grantable) but still excluded from
+// STAFF_ROLES (never self-service).
+export const ASSIGNABLE_ROLES = [...STAFF_ROLES, "DEVELOPER"] as const;
+
 export const SERVICE_TYPES = ["Hourly", "Daily", "Monthly"] as const;
 export type ServiceType = (typeof SERVICE_TYPES)[number];
 

@@ -6,6 +6,7 @@ import InviteStaffForm from "@/components/InviteStaffForm";
 import AccountActivateAction from "@/components/AccountActivateAction";
 import AccountDeactivateAction from "@/components/AccountDeactivateAction";
 import AccountDeleteAction from "@/components/AccountDeleteAction";
+import EditRoleAction from "@/components/EditRoleAction";
 import { ROLE_LABELS, STAFF_ROLES, type Role } from "@/lib/types";
 
 function accountStatus(a: { active: boolean; emailVerifiedAt: Date | null; hasPassword: boolean }) {
@@ -70,13 +71,14 @@ export default async function AccountsPage() {
                   <td>{status}</td>
                   <td>{new Date(a.createdAt).toLocaleDateString()}</td>
                   <td>
-                    <span className="flex items-center gap-2">
+                    <span className="flex flex-wrap items-center gap-2">
                       {status !== "Active" && status !== "Disabled" && (
                         <AccountActivateAction id={a.id} needsPassword={!a.hasPassword} />
                       )}
                       {isDeveloper && (status === "Active" || status === "Disabled") && a.id !== session.sub && (
                         <AccountDeactivateAction id={a.id} active={a.active} />
                       )}
+                      {isDeveloper && a.id !== session.sub && <EditRoleAction id={a.id} currentRole={a.role} />}
                       {isDeveloper && a.id !== session.sub && <AccountDeleteAction id={a.id} name={a.name} />}
                     </span>
                   </td>

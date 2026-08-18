@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import { requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { handleApiError } from "@/lib/api-helpers";
-import { STAFF_ROLES } from "@/lib/types";
+import { ASSIGNABLE_ROLES } from "@/lib/types";
 
 // Any logged-in staff member (any of the 3 staff roles) may add a new staff
 // account — there's no separate "admin" role in this app, so this is
@@ -12,7 +12,6 @@ import { STAFF_ROLES } from "@/lib/types";
 // exception: it's a deliberate, sensitive elevation, so only an existing
 // Developer can grant it (checked below, after parsing — zod alone can't
 // see who the actor is).
-const ASSIGNABLE_ROLES = [...STAFF_ROLES, "DEVELOPER"] as const;
 const createSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
