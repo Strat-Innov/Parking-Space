@@ -2,7 +2,7 @@
 // required). Kept separate from the staff-only Add Account flow (/accounts,
 // requires an existing session) — that one has no domain restriction since
 // it's already gated by "you must already be a trusted, logged-in user."
-const DEFAULT_ALLOWED_DOMAINS = ["filinvestcity.com"];
+const DEFAULT_ALLOWED_DOMAINS = ["filinvestcity.com", "parkingproinc.com"];
 
 export function getAllowedSignupDomains(): string[] {
   const raw = process.env.ALLOWED_SIGNUP_EMAIL_DOMAINS;
