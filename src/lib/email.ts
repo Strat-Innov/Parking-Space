@@ -17,7 +17,7 @@ function getClient(): Resend {
 // Verified sender address in Resend. Defaults to Resend's own shared testing
 // domain, which only delivers to the account owner's own inbox — set
 // EMAIL_FROM once a real domain is verified in the Resend dashboard.
-const FROM = process.env.EMAIL_FROM ?? "Parking Space <onboarding@resend.dev>";
+const FROM = process.env.EMAIL_FROM ?? "Parking Pro Inc. <onboarding@resend.dev>";
 
 export async function sendConfirmationEmail(to: string, name: string, confirmUrl: string) {
   await getClient().emails.send({
