@@ -38,14 +38,21 @@ npm run dev
 
 Visit `http://localhost:3000`. Submit a request via the public
 `/requests/new` form (no login — see below), then log in as each staff role
-in turn to walk it through the lifecycle. Demo accounts (password for all:
-`demo1234`):
+in turn to walk it through the lifecycle. `npm run db:seed` creates one demo
+account per role (password for all: `demo1234`) — type these in manually,
+the login page no longer has a quick-fill list:
 
 | Role | Email |
 |---|---|
 | Prepared By | `prepared@parking.local` |
 | Validated By | `validator@parking.local` |
 | Parking Management | `parkingmgmt@parking.local` |
+
+See [`ACCOUNTS.md`](./ACCOUNTS.md) for how real accounts get created,
+confirmed, and managed in production — self-service signup, email
+invites, the Developer admin role, and multi-role login are all build-time
+additions layered on top of the architecture doc's role model, not
+described there.
 
 **Prepared By** marks the request ready, **Validated By** approves it, then
 **Prepared By** confirms payment and **Parking Management** assigns a slot —
@@ -204,12 +211,18 @@ via `RequestTypeLinks` at the top, in case someone lands on the wrong one
   unusable random password hash, purely to satisfy the `requesterId`
   foreign key — never a real login-capable account, consistent with
   BR-003's "requester loses all access on submission."
+- **Accounts, roles, and authentication are entirely build-time additions**
+  — the architecture doc doesn't cover login at all. `REQUESTER` and
+  `CASHIER` are the only roles the doc implies; every account-management
+  feature (self-service signup with email confirmation, staff invites,
+  the `DEVELOPER` admin role, multi-role login) was added afterward. Full
+  writeup in [`ACCOUNTS.md`](./ACCOUNTS.md) rather than duplicated here.
 
 ## Deploying to Vercel
 
 1. **Storage tab → Create Database** (Postgres, Neon-backed) on your Vercel project, or connect an external Postgres (Neon/Supabase) — either way you end up with a connection string.
-2. **Settings → Environment Variables** on the Vercel project: add `DATABASE_URL` (that connection string) and `SESSION_SECRET` (any long random string — `openssl rand -base64 32`) for the Production environment. Redeploy after adding them (env var changes don't apply to an already-running deployment).
-3. From a machine with `npm`/Node, point a local `.env` at that same `DATABASE_URL` and run `npm run db:push && npm run db:seed` once, to create the tables and demo users in the production database. (Prisma connects directly over the network — this doesn't need to run inside Vercel.)
+2. **Settings → Environment Variables** on the Vercel project: add `DATABASE_URL` (that connection string) and `SESSION_SECRET` (any long random string — `openssl rand -base64 32`) for the Production environment. See [`ACCOUNTS.md`](./ACCOUNTS.md#environment-variables) for the additional email-related variables (`RESEND_API_KEY`, `EMAIL_FROM`, `APP_URL`, `ALLOWED_SIGNUP_EMAIL_DOMAINS`) needed for self-service signup and staff invites to actually send mail. Redeploy after adding any of these (env var changes don't apply to an already-running deployment).
+3. From a machine with `npm`/Node, point a local `.env` at that same `DATABASE_URL` and run `npm run db:push && npm run db:seed` once, to create the tables and demo users in the production database. (Prisma connects directly over the network — this doesn't need to run inside Vercel.) Since then, every further schema change has been applied by hand as raw SQL in Neon's SQL Editor rather than re-running `db:push` — see [`ACCOUNTS.md`](./ACCOUNTS.md#schema-migration-history) for the exact statements, in order, if you need to reproduce this database from scratch.
 
 Without step 2, every request that touches the database fails with a 500 —
 there's no `DATABASE_URL` for Prisma to connect to. Without step 3, login
