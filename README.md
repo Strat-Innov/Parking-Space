@@ -217,6 +217,31 @@ via `RequestTypeLinks` at the top, in case someone lands on the wrong one
   feature (self-service signup with email confirmation, staff invites,
   the `DEVELOPER` admin role, multi-role login) was added afterward. Full
   writeup in [`ACCOUNTS.md`](./ACCOUNTS.md) rather than duplicated here.
+- **UI copy deliberately doesn't surface internal workflow codes** — labels
+  like `WF03`, `AWF02`, `BR-001/BR-002`, and the raw `workflow` string that
+  used to prefix every Timeline/audit-log entry (e.g. `WF02`, `DEV_REVERT`)
+  were all build-time text living in card headings, button labels, and
+  validation messages. Removed wherever end users would actually see them —
+  the status transition or button context already says what happened
+  without the internal code — while keeping them in source comments, where
+  the cross-reference to `ARCHITECTURE.md`'s section numbers is genuinely
+  useful for future maintenance.
+- **Appearance settings live under the user menu, not the nav bar** — the
+  Light/Dark/System toggle used to sit permanently in the header; it's now
+  under **Settings** in the account dropdown (`src/components/
+  SettingsModal.tsx`), opened as a modal with a tab bar. Only one tab
+  ("Theme") exists today, but it's structured so a future setting has
+  somewhere to go without a redesign. The logged-out toggle shown on
+  `/login`/`/signup` (there's no user menu to attach it to pre-login) is
+  unchanged.
+- **Password fields have a show/hide toggle** (`src/components/
+  PasswordInput.tsx`, a drop-in replacement for `<input type="password">`)
+  everywhere a password is entered — login, signup, change password, accept
+  invite, direct account creation, and the manual account-activation
+  fallback.
+- **The login page's product name is "ParkServe"** ("Parking Request &
+  Access Management Portal"), distinct from this repo/company's name above
+  — a display-only rebrand, no functional change.
 
 ## Deploying to Vercel
 
