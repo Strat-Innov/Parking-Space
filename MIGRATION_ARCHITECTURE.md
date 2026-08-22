@@ -12,6 +12,12 @@ availability · append-only RateTable · RequestEvent/AccessRequestEvent audit
 behaviour · BR-007 (WF06 sole writer of `Completed`) · all existing validation
 rules · every API request/response contract · all UI behaviour.
 
+**Governing principle — no behaviour changes during the database migration.**
+Not even provably-unobservable ones. An optimisation shipped alongside a
+migration makes a migration bug and an optimisation bug indistinguishable.
+Replicate current behaviour exactly, migrate, verify, then optimise afterwards as
+its own reviewable change.
+
 ---
 
 ## Finding that changes Step 1
@@ -122,14 +128,26 @@ export type TransitionSpec<T> = {
 export interface TransitionRunner<T> {
   /** Read → guard → CAS-update → append event. On version conflict, re-read
    *  and retry a bounded number of times; the guard re-runs each attempt, so a
-   *  genuinely-lost race surfaces as the caller's normal 409, not a 5xx. */
+   *  genuinely-lost race surfaces as the caller's normal 409, not a 5xx.
+   *
+   *  ATOMICITY: on Prisma this whole sequence is one transaction. On SharePoint
+   *  it is NOT — the CAS update and the event append are separate writes to
+   *  separate lists, and the update can succeed while the append fails. This
+   *  interface deliberately does not promise atomicity, because one of its two
+   *  implementations cannot deliver it. See §8. */
   transition(id: string, spec: TransitionSpec<T>): Promise<T>;
 }
 ```
 
+**The interface is not a transaction boundary.** It is a *guarded, concurrency-
+safe state transition with a best-effort audit append*. Prisma implements it
+atomically because it can; SharePoint implements it non-atomically because it
+must. Callers must not assume the stronger guarantee, and the divergence the
+weaker one permits is handled by the reconciliation requirement in §8.5.
+
 WF04 and WF05 each become **two sequential `transition` calls** — their own, then
-WF06's — rather than one nested transaction. §8.3 covers what happens if the
-process dies between them.
+WF06's — rather than one nested transaction. Neither the pair, nor either call
+internally, is atomic on SharePoint. §8.5(b) defines the required recovery.
 
 ### 1.4 The repository interfaces
 
@@ -459,66 +477,169 @@ caching that is one Graph call per reference.
 
 ## 8. Transactions, ETags, concurrency
 
-### 8.1 What is actually lost
-Nothing that today's code depends on for *correctness of reads* — no query reads
-across two models inside a transaction to make a decision. What is lost is
-**write atomicity**: item and event row can diverge.
+### 8.1 The honest statement of what SharePoint gives up
 
-### 8.2 ETag compare-and-swap
-Every `transition()` implementation:
+**SharePoint/Graph cannot provide atomicity across a request update and its
+event append. ETag CAS protects a single item against concurrent modification.
+It does not make two writes to two lists one unit of work. Request + event is
+not a transaction, and no arrangement of Graph calls makes it one.**
+
+Today, on Postgres:
+
+```
+BEGIN
+  UPDATE ParkingRequest ...
+  INSERT RequestEvent ...
+COMMIT          -- both, or neither
+```
+
+On SharePoint the same logic is two independent HTTP calls:
+
+```
+1. GET request item            (+ ETag)
+2. check status guard           in memory
+3. PATCH request  If-Match      ✅ committed, irreversibly
+4. POST RequestEvent            ❌ network error / 429 / process death
+                                   → request advanced, audit row missing
+```
+
+Step 3 cannot be rolled back once it returns 200. There is no compensating
+"un-transition" that is safe either: writing the old status back would itself be
+an unaudited state change, and it would race against any concurrent reader that
+already observed the new status.
+
+**This is a genuine reduction in guarantee relative to Postgres, not an
+equivalent mechanism.** The architecture accepts it and detects/repairs it, which
+is why §8.5 is a requirement rather than a recommendation.
+
+### 8.2 Operation classification
+
+Read this table as the contract. Anything an implementation claims beyond it is
+wrong.
+
+| Operation | SharePoint behaviour | Guarantee |
+|---|---|---|
+| Request status transition | ETag `If-Match` compare-and-swap | **Protected** — a concurrent modification is detected, never silently lost |
+| Event append | Separate `POST` to a different list | **Independent** — succeeds or fails on its own |
+| Request + event atomicity | Two unrelated HTTP calls | **NOT GUARANTEED** — the defining gap |
+| Concurrent transition protection | ETag + re-run of the existing status guard | **Protected** — a lost race surfaces as today's 409 |
+| Ordering within one transition | Request update strictly before event append | **Guaranteed by construction** — never append first |
+| Audit completeness | Reconciliation required (§8.5) | **Eventually consistent, not immediate** |
+| WF04/WF05 → WF06 hand-off | Two sequential transitions | **NOT ATOMIC** — reconciliation required |
+| Delete + cascade of events | Ordered deletes, no transaction | **NOT ATOMIC** — recovery strategy required (§8.6) |
+| `rejectionCount` increment | Read-modify-write under CAS | **Protected** — CAS replaces Postgres's atomic increment |
+
+```
+Transition
+   │
+   ├── 1. GET item + ETag
+   ├── 2. guard (in memory, re-run on every retry)
+   ├── 3. PATCH item  If-Match ──── 412 ──> re-read, retry (bounded)
+   │        │
+   │        └── 200: committed, irreversible
+   │
+   └── 4. POST event ──── failure? ──> DIVERGENCE
+                                          │
+                                          ▼
+                                    reconciliation (§8.5)
+```
+
+### 8.3 ETag compare-and-swap — what it does cover
+
 1. `GET` the item; capture its ETag.
 2. Run `guard` in memory; a violation throws the same `WorkflowError` as today.
 3. `PATCH` with `If-Match: <etag>`.
 4. On `412 Precondition Failed`: re-read and retry from step 1, bounded (3
    attempts) with jittered backoff. Because the guard re-runs, a genuinely-lost
    race produces the existing 409 message, not a new failure mode.
-5. On success, append the event row.
+5. Append the event row — **separately, and fallibly** (§8.1).
 
-This is a **stronger** guarantee than today for the read-modify-write cases.
-`rejectionCount: { increment: 1 }` currently relies on Postgres's atomic
-increment; under CAS it becomes read-increment-write, which is safe here and
-observably identical.
+Within its scope this is sound, and for one narrow case it is stronger than
+today: `rejectionCount: { increment: 1 }` currently relies on Postgres's atomic
+increment, and CAS preserves that correctness without it. **That narrow
+improvement must not be read as request+event atomicity.**
 
-### 8.3 Where compensation is genuinely needed
+### 8.4 Ordering rule (mandatory)
 
-**WF01 (create → route → 2 events).** The current code creates the row as
-`Submitted`, immediately updates it to `In Preparation`, and logs two events. Its
-own comment states a caller *never observes a request resting in "Submitted"*.
-**Proposal: create the item once, already in `In Preparation`, then append both
-event rows unchanged.** Four writes become three, the intermediate state that
-nobody can observe disappears, and the audit trail is byte-identical. This is a
-behaviour-preserving simplification — but it is a judgment call about an
-unobservable state, so it needs your explicit sign-off rather than being an
-implementation detail.
+**The request update always precedes the event append. Never the reverse.**
 
-**WF04/WF05 → WF06.** Two sequential transitions. If the process dies between
-them, a request sits `Approved` with both tracks confirmed and no `Completed`.
-Mitigations, in order of preference:
-1. **Make WF06 idempotent** (it already re-reads and no-ops unless
-   `Approved` + both tracks) — so simply re-running it repairs the state.
-2. **Add a reconciliation sweep** — a Vercel cron that finds `Approved` +
-   `Confirmed` + `Assigned` rows and runs WF06. Small, safe, and it preserves
-   BR-007 because it calls the same sole writer.
-3. Do *not* opportunistically run WF06 on read — that would make a GET mutate
-   data and change observable behaviour.
+An orphaned event with no corresponding state change is indistinguishable from a
+real transition in the audit trail, and would make the Timeline lie. A missing
+event, by contrast, is detectable — the item's status will not match its event
+history — and therefore repairable. The failure mode is chosen deliberately:
+**prefer a detectable gap over an undetectable falsehood.**
 
-Recommendation: (1) + (2). Decision needed on whether the cron is acceptable.
+### 8.5 Reconciliation — an architectural requirement
 
-**Cascade deletes** (`requests/[id]/delete`, `accounts/[id]/delete`). Order
-matters: delete events, then the request; clear attribution, then the user. A
-mid-sequence failure leaves orphaned-but-harmless rows and the operation is
-safely re-runnable. Both are Developer-only, rare, and already guarded.
+**This is a required component of the SharePoint implementation, not an
+operational nicety. Phase 3 is not complete without it.**
 
-**`$batch` is not a transaction.** It reduces round trips (up to 20 requests per
-batch), nothing more. Use it for `parking-spaces/bulk` and hydration fan-out;
-never reason about it as atomic.
+Three distinct divergences must be handled:
 
-### 8.4 Throttling
+**(a) Missing event after a successful request update.**
+- *Detect:* the item's current `Status`/`ApprovalStage` has no corresponding
+  terminal event row in `RequestEvents` for that request.
+- *Repair:* append the missing event, marked as reconstructed (e.g. a `note`
+  suffix such as `[reconciled]`) so the audit trail never silently pretends the
+  write was contemporaneous.
+- *Immediate mitigation:* the repository retries the event append on transient
+  failures (429/5xx) before giving up, and **logs a structured, alertable record**
+  of any append it could not complete — request id, workflow, intended
+  from/to status, actor, timestamp. That log is the input to repair; without it
+  the divergence is undetectable after the fact.
+
+**(b) WF04/WF05 → WF06 hand-off interrupted.**
+- *Detect:* requests with `Status = "Approved"` **and** `PaymentStatus =
+  "Confirmed"` **and** `SlotStatus = "Assigned"`. By BR-007 these should already
+  be `Completed`; their existence is definitionally a stuck hand-off.
+- *Repair:* run WF06 — the **same sole writer**, so BR-007 holds. WF06 is
+  already idempotent (it re-reads and no-ops unless `Approved` + both tracks
+  confirmed), so re-running is safe and repeatable.
+- *Not permitted:* running WF06 opportunistically during a read. A GET must
+  never mutate data — that would be a behaviour change.
+
+**(c) Partial cascade delete.** See §8.6.
+
+**Delivery mechanism.** A scheduled sweep (Vercel cron) running the (a) and (b)
+detectors and repairing what it finds, plus the same detectors exposed as a
+Developer-only diagnostic so the state can be inspected on demand. Frequency is
+a decision (§ Decisions); the detectors are cheap — (b) is a single indexed
+three-clause filter.
+
+**Acceptance criterion for Phase 3:** a test that kills the process between the
+request update and the event append, and between WF04/WF05 and WF06, then
+asserts the reconciler restores a correct, complete state.
+
+### 8.6 Cascade deletes
+
+`requests/[id]/delete` (events then request) and `accounts/[id]/delete` (clear
+attribution ×2 lists, then delete user) are multi-list sequences with no
+transaction.
+
+- **Order events-then-request** so a mid-sequence failure leaves a request whose
+  events are partly gone — visible, and re-running the delete completes it.
+  Deleting the request first would orphan events pointing at a request id that
+  no longer resolves, which the Timeline cannot render and the reconciler cannot
+  attribute.
+- Both operations must be **idempotent and safely re-runnable**; the repository
+  treats "already absent" as success.
+- Both are Developer-only and rare, so a manual re-run is an acceptable recovery
+  path — but the partial state must be **logged**, per (a).
+
+### 8.7 `$batch` is not a transaction
+
+It reduces round trips (up to 20 requests per batch) and nothing more. Use it for
+`parking-spaces/bulk` and hydration fan-out; never reason about it as atomic. A
+partially-applied batch is a normal outcome that the caller must handle.
+
+### 8.8 Throttling
+
 Graph returns `429` with `Retry-After`. The client needs centralised retry with
 exponential backoff and jitter for 429/503, plus a request budget per page render
 — otherwise a dashboard with hundreds of rows becomes a self-inflicted DoS.
+Throttling is also the most likely *cause* of a failed event append, which ties
+directly back to §8.5(a).
 
----
 
 ## 9. Pagination and the 5,000-item threshold
 
@@ -744,10 +865,10 @@ Nothing below is authorised by this document. Each phase is a separate decision.
 
 | Phase | Work | Exit criteria |
 |---|---|---|
-| **0. Test harness** | Vitest + dockerised Postgres + CI; write the §12.1 characterisation suite against current Prisma code. **No production code changes.** | Suite green on `main`, CI running, WF01–WF06 + AWF01–AWF03 + all business rules covered |
+| **0. Test harness** | Vitest + a real Postgres instance + CI; write the §12.1 characterisation suite against current Prisma code. **No production code changes.** | Suite green on `main`, CI running, WF01–WF06 + AWF01–AWF03 + all business rules covered |
 | **1. Introduce the boundary** | Define §1 interfaces; implement `PrismaRepositories`; migrate all 104 call sites; `transition()` backed by `$transaction`. Behaviour-neutral by construction. | Phase 0 suite passes **unedited**; no route or component diff beyond import/call swaps; response bodies byte-identical |
 | **2. Provision SharePoint** | Create 7 lists per §5, indexes per §6, `Sites.Selected` app registration + site grant per §10. Infrastructure only. | Lists match `schema.prisma` field-for-field on review; indexes verified present; app can read and write only that site |
-| **3. SharePoint implementation** | Build `SharePointRepositories` behind the same interfaces: Graph client, auth, ETag CAS, hydration, paging, throttling. Promote the suite to the §12.3 contract suite. | Contract suite green against both backends; SharePoint-only tests pass |
+| **3. SharePoint implementation** | Build `SharePointRepositories` behind the same interfaces: Graph client, auth, ETag CAS, hydration, paging, throttling, **and the §8.5 reconciler**. Promote the suite to the §12.3 contract suite. | Contract suite green against both backends; SharePoint-only tests pass; **reconciler proven by the §8.5 kill-between-writes test** — Phase 3 is not complete without it |
 | **4. Data migration** | Export → transform → load → validate per §11, into a staging site first. | All §11.2 gates pass on staging; full-record diff clean; rehearsed twice |
 | **5. Cutover** | Freeze writes, load production, flip `DATA_BACKEND=sharepoint`, keep Neon read-only. | App runs on SharePoint; rollback = one env var; validation period defined before starting |
 | **6. Retire** | After the validation period: decommission Neon, remove the Prisma implementation. | Separate, deliberate cleanup — never bundled into Phase 5 |
@@ -761,11 +882,15 @@ cancelled.
 
 ## Decisions needed before Phase 1
 
-1. **WF01 single-create** (§8.3) — collapse create-then-route into one create in
-   the already-routed state? Behaviour-preserving because the intermediate state
-   is unobservable, but it is your call, not an implementation detail.
-2. **WF06 reconciliation sweep** (§8.3) — is a Vercel cron acceptable as the
-   repair mechanism for an interrupted WF04/WF05 → WF06 hand-off?
+1. ~~**WF01 single-create**~~ — **DECIDED: do not collapse.** WF01 keeps both
+   operations (create as `Submitted`, then transition to `In Preparation`) and
+   both event rows, exactly as today. No behaviour changes during the database
+   migration; optimisation is a separate change after a successful migration, so
+   that a migration bug and a workflow optimisation can never be confused for
+   one another.
+2. **Reconciliation sweep frequency** (§8.5) — a Vercel cron is required, not
+   optional. What cadence, and is a Developer-only diagnostic view wanted
+   alongside it?
 3. **App-identity audit trail** (§2, §10.4) — accept that SharePoint's
    Created/Modified By shows the application, with human attribution living only
    in the app's own columns?
