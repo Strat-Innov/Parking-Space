@@ -1,6 +1,7 @@
-import { Prisma, ParkingRequest } from "@prisma/client";
 import { startOfDay, addMonths, differenceInCalendarMonths } from "date-fns";
-import { prisma } from "./prisma";
+import { repos } from "./data";
+import type { ParkingRequestRecord } from "./data/types";
+import type { ParkingRequestTransition } from "./data/repositories";
 import type { SessionPayload } from "./auth";
 import type { ServiceType } from "./types";
 
@@ -13,8 +14,6 @@ export class WorkflowError extends Error {
     this.status = status;
   }
 }
-
-type Tx = Prisma.TransactionClient;
 
 // --- Section 5 computed fields -------------------------------------------------
 
@@ -40,42 +39,13 @@ export function computeTotals(serviceType: ServiceType, start: Date, end: Date) 
   return totals;
 }
 
-function unitsFor(serviceType: ServiceType, req: Pick<ParkingRequest, "totalHours" | "totalDays" | "totalMonths">) {
+function unitsFor(
+  serviceType: ServiceType,
+  req: Pick<ParkingRequestRecord, "totalHours" | "totalDays" | "totalMonths">,
+) {
   if (serviceType === "Hourly") return req.totalHours ?? 0;
   if (serviceType === "Daily") return req.totalDays ?? 0;
   return req.totalMonths ?? 0;
-}
-
-// --- Section 7 — Rate Table resolution -----------------------------------------
-//
-// Append-only: we never edit a past row. "Current rate" is resolved by
-// picking the most recent row whose effectiveStartDate has passed, as of
-// `asOf`. This is what keeps old snapshots audit-safe even if the table is
-// edited later — the OLD row is untouched, so any ID-only pointer into it
-// still resolves to the value that was actually in force at the time.
-async function resolveCurrentRate(tx: Tx, serviceType: string, asOf: Date) {
-  const rate = await tx.rateTableEntry.findFirst({
-    where: { serviceType, effectiveStartDate: { lte: asOf } },
-    orderBy: { effectiveStartDate: "desc" },
-  });
-  if (!rate) {
-    throw new WorkflowError(`No effective rate configured for service type "${serviceType}" as of ${asOf.toISOString()}`, 409);
-  }
-  return rate;
-}
-
-async function logEvent(
-  tx: Tx,
-  requestId: string,
-  workflow: string,
-  fromStatus: string | null,
-  toStatus: string | null,
-  actorId: string | null,
-  note?: string
-) {
-  await tx.requestEvent.create({
-    data: { requestId, workflow, fromStatus, toStatus, actorId, note },
-  });
 }
 
 // --- Submission + WF01 (Route for Review) ---------------------------------------
@@ -84,6 +54,10 @@ async function logEvent(
 // the instant the item is created, so in practice a caller never observes a
 // request actually resting in "Submitted" — that's intentional, it mirrors
 // "Item created" as WF01's trigger in the architecture doc.
+//
+// The two steps stay two steps. Collapsing them into a single create would be
+// unobservable through the API, but this is a persistence migration, not a
+// cleanup: behaviour changes and migration changes must not travel together.
 
 export type SubmitRequestInput = {
   fullName: string;
@@ -138,36 +112,47 @@ export async function submitRequest(input: SubmitRequestInput, requesterId: stri
 
   const totals = computeTotals(input.serviceType, input.requiredStartDate, input.endDate);
 
-  return prisma.$transaction(async (tx) => {
-    const created = await tx.parkingRequest.create({
-      data: {
-        fullName: input.fullName,
-        companyName: input.companyName,
-        emailAddress: input.emailAddress,
-        serviceType: input.serviceType,
-        preferredParkingLocation: input.preferredParkingLocation,
-        requestedSlot: input.requestedSlot || null,
-        dateOfRequest,
-        requiredStartDate: input.requiredStartDate,
-        endDate: input.endDate,
-        purpose: input.purpose,
-        status: "Submitted",
-        approvalStage: "Prepared By",
-        requesterId,
-        ...totals,
+  return repos.parkingRequests.create(
+    {
+      fullName: input.fullName,
+      companyName: input.companyName,
+      emailAddress: input.emailAddress,
+      serviceType: input.serviceType,
+      preferredParkingLocation: input.preferredParkingLocation,
+      requestedSlot: input.requestedSlot || null,
+      dateOfRequest,
+      requiredStartDate: input.requiredStartDate,
+      endDate: input.endDate,
+      purpose: input.purpose,
+      status: "Submitted",
+      approvalStage: "Prepared By",
+      requesterId,
+      ...totals,
+    },
+    {
+      event: {
+        workflow: "WF01",
+        fromStatus: "Submitted",
+        toStatus: "Submitted",
+        actorId: requesterId,
+        note: "Item created",
       },
-    });
-    await logEvent(tx, created.id, "WF01", "Submitted", "Submitted", requesterId, "Item created");
-
-    // WF01: Submitted -> In Preparation, fired immediately on creation.
-    const routed = await tx.parkingRequest.update({
-      where: { id: created.id },
-      data: { status: "In Preparation" },
-    });
-    await logEvent(tx, created.id, "WF01", "Submitted", "In Preparation", null, "Routed for review");
-
-    return routed;
-  });
+      // WF01: Submitted -> In Preparation, fired immediately on creation, in
+      // the same unit of work as the create.
+      andThen: () => ({
+        plan: () => ({
+          patch: { status: "In Preparation" },
+          event: {
+            workflow: "WF01",
+            fromStatus: "Submitted",
+            toStatus: "In Preparation",
+            actorId: null,
+            note: "Routed for review",
+          },
+        }),
+      }),
+    },
+  );
 }
 
 // --- WF02 — Prepared By Validation ------------------------------------------------
@@ -182,51 +167,61 @@ export async function submitRequest(input: SubmitRequestInput, requesterId: stri
 export async function updateRequestDetails(requestId: string, actor: SessionPayload, input: SubmitRequestInput) {
   if (actor.role !== "PREPARED_BY") throw new WorkflowError("Only Prepared By can edit request details.", 403);
 
-  return prisma.$transaction(async (tx) => {
-    const req = await tx.parkingRequest.findUniqueOrThrow({ where: { id: requestId } });
-    if (req.status !== "In Preparation") {
-      throw new WorkflowError('Details can only be edited while Status = "In Preparation".', 409);
-    }
+  return repos.parkingRequests.transition(requestId, {
+    plan: (req) => {
+      if (req.status !== "In Preparation") {
+        throw new WorkflowError('Details can only be edited while Status = "In Preparation".', 409);
+      }
 
-    // Anchored to the ORIGINAL Date of Request, not "now" — see
-    // validateIntakeFields' comment.
-    validateIntakeFields(input, req.dateOfRequest);
-    const totals = computeTotals(input.serviceType, input.requiredStartDate, input.endDate);
+      // Anchored to the ORIGINAL Date of Request, not "now" — see
+      // validateIntakeFields' comment.
+      validateIntakeFields(input, req.dateOfRequest);
+      const totals = computeTotals(input.serviceType, input.requiredStartDate, input.endDate);
 
-    const updated = await tx.parkingRequest.update({
-      where: { id: requestId },
-      data: {
-        fullName: input.fullName,
-        companyName: input.companyName,
-        emailAddress: input.emailAddress,
-        serviceType: input.serviceType,
-        preferredParkingLocation: input.preferredParkingLocation,
-        requestedSlot: input.requestedSlot || null,
-        requiredStartDate: input.requiredStartDate,
-        endDate: input.endDate,
-        purpose: input.purpose,
-        ...totals,
-      },
-    });
-    await logEvent(tx, requestId, "WF02", null, null, actor.sub, "Details edited by Prepared By");
-    return updated;
+      return {
+        patch: {
+          fullName: input.fullName,
+          companyName: input.companyName,
+          emailAddress: input.emailAddress,
+          serviceType: input.serviceType,
+          preferredParkingLocation: input.preferredParkingLocation,
+          requestedSlot: input.requestedSlot || null,
+          requiredStartDate: input.requiredStartDate,
+          endDate: input.endDate,
+          purpose: input.purpose,
+          ...totals,
+        },
+        event: {
+          workflow: "WF02",
+          fromStatus: null,
+          toStatus: null,
+          actorId: actor.sub,
+          note: "Details edited by Prepared By",
+        },
+      };
+    },
   });
 }
 
 export async function wf02EndorseForValidation(requestId: string, actor: SessionPayload) {
   if (actor.role !== "PREPARED_BY") throw new WorkflowError("Only Prepared By can advance this request.", 403);
 
-  return prisma.$transaction(async (tx) => {
-    const req = await tx.parkingRequest.findUniqueOrThrow({ where: { id: requestId } });
-    if (req.status !== "In Preparation") {
-      throw new WorkflowError(`Requires Status = "In Preparation" (current: "${req.status}").`, 409);
-    }
-    const updated = await tx.parkingRequest.update({
-      where: { id: requestId },
-      data: { status: "Pending Approval", approvalStage: "Validated By", preparedById: actor.sub },
-    });
-    await logEvent(tx, requestId, "WF02", "In Preparation", "Pending Approval", actor.sub, "Endorsed for validation");
-    return updated;
+  return repos.parkingRequests.transition(requestId, {
+    plan: (req) => {
+      if (req.status !== "In Preparation") {
+        throw new WorkflowError(`Requires Status = "In Preparation" (current: "${req.status}").`, 409);
+      }
+      return {
+        patch: { status: "Pending Approval", approvalStage: "Validated By", preparedById: actor.sub },
+        event: {
+          workflow: "WF02",
+          fromStatus: "In Preparation",
+          toStatus: "Pending Approval",
+          actorId: actor.sub,
+          note: "Endorsed for validation",
+        },
+      };
+    },
   });
 }
 
@@ -240,79 +235,104 @@ export async function wf03Decide(
 ) {
   if (actor.role !== "VALIDATED_BY") throw new WorkflowError("Only Validated By can record an approval decision.", 403);
 
-  return prisma.$transaction(async (tx) => {
-    const req = await tx.parkingRequest.findUniqueOrThrow({ where: { id: requestId } });
-    if (req.status !== "Pending Approval") {
-      throw new WorkflowError(`Requires Status = "Pending Approval" (current: "${req.status}").`, 409);
-    }
+  return repos.parkingRequests.transition(requestId, {
+    plan: async (req, reads) => {
+      if (req.status !== "Pending Approval") {
+        throw new WorkflowError(`Requires Status = "Pending Approval" (current: "${req.status}").`, 409);
+      }
 
-    const now = new Date();
+      const now = new Date();
 
-    if (decision === "Rejected") {
-      if (!rejectionReason?.trim()) throw new WorkflowError("Rejection reason is required.", 422);
-      // BR-004: loop back to In Preparation / Prepared By. Same item — no
-      // duplicate is ever created, and the requester is never re-involved.
-      const updated = await tx.parkingRequest.update({
-        where: { id: requestId },
-        data: {
-          status: "In Preparation",
-          approvalStage: "Prepared By",
-          approvalDecision: "Rejected",
+      if (decision === "Rejected") {
+        if (!rejectionReason?.trim()) throw new WorkflowError("Rejection reason is required.", 422);
+        // BR-004: loop back to In Preparation / Prepared By. Same item — no
+        // duplicate is ever created, and the requester is never re-involved.
+        return {
+          patch: {
+            status: "In Preparation",
+            approvalStage: "Prepared By",
+            approvalDecision: "Rejected",
+            validatedById: actor.sub,
+            validatedDate: now,
+            // Kept as an atomic increment rather than req.rejectionCount + 1:
+            // the store may implement it atomically, and flattening it here
+            // would quietly weaken concurrent-update behaviour.
+            rejectionCount: { increment: 1 },
+            rejectionReason,
+            rejectedById: actor.sub,
+            rejectedDate: now,
+          },
+          event: {
+            workflow: "WF03",
+            fromStatus: "Pending Approval",
+            toStatus: "In Preparation",
+            actorId: actor.sub,
+            note: `Rejected: ${rejectionReason}`,
+          },
+        };
+      }
+
+      // decision === "Approved" — rate snapshot happens exactly here (Section 7:
+      // "Rate snapshot timing: Approval / WF03 exit", not at Submission).
+      //
+      // Section 7 resolution: the most recent row whose effectiveStartDate has
+      // passed, as of `now`. Append-only, so an older snapshot stays valid even
+      // if the table gains rows later.
+      const rate = await reads.resolveCurrentRate(req.serviceType, now);
+      if (!rate) {
+        throw new WorkflowError(
+          `No effective rate configured for service type "${req.serviceType}" as of ${now.toISOString()}`,
+          409,
+        );
+      }
+      const units = unitsFor(req.serviceType as ServiceType, req);
+      const totalPaymentDue = Math.round(rate.rateAmount * units * 100) / 100;
+
+      return {
+        patch: {
+          status: "Approved",
+          approvalStage: "Post-Approval",
+          approvalDecision: "Approved",
           validatedById: actor.sub,
           validatedDate: now,
-          rejectionCount: { increment: 1 },
-          rejectionReason,
-          rejectedById: actor.sub,
-          rejectedDate: now,
+          rateVersionId: rate.id,
+          rateAmountSnapshot: rate.rateAmount,
+          rateSnapshotDate: now,
+          totalPaymentDue,
         },
-      });
-      await logEvent(tx, requestId, "WF03", "Pending Approval", "In Preparation", actor.sub, `Rejected: ${rejectionReason}`);
-      return updated;
-    }
-
-    // decision === "Approved" — rate snapshot happens exactly here (Section 7:
-    // "Rate snapshot timing: Approval / WF03 exit", not at Submission).
-    const rate = await resolveCurrentRate(tx, req.serviceType, now);
-    const units = unitsFor(req.serviceType as ServiceType, req);
-    const totalPaymentDue = Math.round(rate.rateAmount * units * 100) / 100;
-
-    const updated = await tx.parkingRequest.update({
-      where: { id: requestId },
-      data: {
-        status: "Approved",
-        approvalStage: "Post-Approval",
-        approvalDecision: "Approved",
-        validatedById: actor.sub,
-        validatedDate: now,
-        rateVersionId: rate.id,
-        rateAmountSnapshot: rate.rateAmount,
-        rateSnapshotDate: now,
-        totalPaymentDue,
-      },
-    });
-    await logEvent(tx, requestId, "WF03", "Pending Approval", "Approved", actor.sub, `Rate snapshot v${rate.id} @ ${rate.rateAmount}`);
-    return updated;
+        event: {
+          workflow: "WF03",
+          fromStatus: "Pending Approval",
+          toStatus: "Approved",
+          actorId: actor.sub,
+          note: `Rate snapshot v${rate.id} @ ${rate.rateAmount}`,
+        },
+      };
+    },
   });
 }
 
 // --- WF06 — Completion Check ------------------------------------------------------
-// The ONLY workflow permitted to write Status = Completed (BR-007). Called
-// from inside WF04/WF05 after either track changes; never invoked directly
-// by a route so the "check both" logic lives in exactly one place.
+// The ONLY place permitted to write Status = Completed (BR-007). Chained from
+// inside WF04/WF05 after either track changes; never invoked directly by a
+// route, so the "check both" logic lives in exactly one place.
 
-async function wf06CheckCompletion(tx: Tx, requestId: string) {
-  const req = await tx.parkingRequest.findUniqueOrThrow({ where: { id: requestId } });
-  if (req.status !== "Approved") return req; // nothing to do outside the Approved window
-  if (req.paymentStatus === "Confirmed" && req.slotStatus === "Assigned") {
-    const now = new Date();
-    const updated = await tx.parkingRequest.update({
-      where: { id: requestId },
-      data: { status: "Completed", approvalStage: "Completed", completedDate: now },
-    });
-    await logEvent(tx, requestId, "WF06", "Approved", "Completed", null, "Both tracks confirmed (BR-007)");
-    return updated;
-  }
-  return req;
+function wf06CompletionSpec(req: ParkingRequestRecord): ParkingRequestTransition | null {
+  if (req.status !== "Approved") return null; // nothing to do outside the Approved window
+  if (req.paymentStatus !== "Confirmed" || req.slotStatus !== "Assigned") return null;
+
+  return {
+    plan: () => ({
+      patch: { status: "Completed", approvalStage: "Completed", completedDate: new Date() },
+      event: {
+        workflow: "WF06",
+        fromStatus: "Approved",
+        toStatus: "Completed",
+        actorId: null,
+        note: "Both tracks confirmed (BR-007)",
+      },
+    }),
+  };
 }
 
 // --- WF04 — Payment Processing (independent track, BR-006) ------------------------
@@ -333,25 +353,30 @@ export async function wf04ConfirmPayment(
   if (!officialReceiptReference?.trim()) throw new WorkflowError("Official Receipt Reference is required.", 422);
   if (!payDate || Number.isNaN(payDate.getTime())) throw new WorkflowError("A valid Pay Date is required.", 422);
 
-  return prisma.$transaction(async (tx) => {
-    const req = await tx.parkingRequest.findUniqueOrThrow({ where: { id: requestId } });
-    if (req.status !== "Approved") throw new WorkflowError('Requires Status = "Approved".', 409);
-    if (req.paymentStatus === "Confirmed") throw new WorkflowError("Payment already confirmed.", 409);
+  return repos.parkingRequests.transition(requestId, {
+    plan: (req) => {
+      if (req.status !== "Approved") throw new WorkflowError('Requires Status = "Approved".', 409);
+      if (req.paymentStatus === "Confirmed") throw new WorkflowError("Payment already confirmed.", 409);
 
-    await tx.parkingRequest.update({
-      where: { id: requestId },
-      data: {
-        paymentStatus: "Confirmed",
-        cashierId: actor.sub,
-        payDate,
-        officialReceiptReference,
-      },
-    });
-    await logEvent(tx, requestId, "WF04", req.paymentStatus, "Confirmed", actor.sub, `OR# ${officialReceiptReference}`);
-
+      return {
+        patch: {
+          paymentStatus: "Confirmed",
+          cashierId: actor.sub,
+          payDate,
+          officialReceiptReference,
+        },
+        event: {
+          workflow: "WF04",
+          fromStatus: req.paymentStatus,
+          toStatus: "Confirmed",
+          actorId: actor.sub,
+          note: `OR# ${officialReceiptReference}`,
+        },
+      };
+    },
     // WF04 never checks Slot Status itself (BR-006) — it only hands off to
     // the single join workflow.
-    return wf06CheckCompletion(tx, requestId);
+    andThen: wf06CompletionSpec,
   });
 }
 
@@ -360,76 +385,61 @@ export async function wf04ConfirmPayment(
 // A space is unavailable only for the specific window it's actually booked
 // (Cancelled requests never held it; excludeRequestId lets a request check
 // against every OTHER booking without tripping over its own row).
-async function findConflictingBooking(
-  tx: Tx,
-  parkingSpaceId: string,
-  start: Date,
-  end: Date,
-  excludeRequestId?: string
-) {
-  return tx.parkingRequest.findFirst({
-    where: {
-      parkingSpaceId,
-      slotStatus: "Assigned",
-      status: { not: "Cancelled" },
-      ...(excludeRequestId ? { id: { not: excludeRequestId } } : {}),
-      requiredStartDate: { lt: end },
-      endDate: { gt: start },
-    },
-  });
-}
-
+//
 // Used outside a transaction (e.g. to build a dropdown of choices) — returns
 // the set of ParkingSpace ids already booked over [start, end].
 export async function findLockedSpaceIds(start: Date, end: Date, excludeRequestId?: string) {
-  const bookings = await prisma.parkingRequest.findMany({
-    where: {
-      parkingSpaceId: { not: null },
-      slotStatus: "Assigned",
-      status: { not: "Cancelled" },
-      ...(excludeRequestId ? { id: { not: excludeRequestId } } : {}),
-      requiredStartDate: { lt: end },
-      endDate: { gt: start },
-    },
-    select: { parkingSpaceId: true },
-  });
-  return new Set(bookings.map((b) => b.parkingSpaceId as string));
+  return repos.parkingRequests.findLockedSpaceIds(start, end, excludeRequestId);
 }
 
 export async function wf05AssignSlot(requestId: string, actor: SessionPayload, parkingSpaceId: string) {
   if (actor.role !== "PARKING_MANAGEMENT") throw new WorkflowError("Only Parking Management can assign a slot.", 403);
   if (!parkingSpaceId?.trim()) throw new WorkflowError("A parking space is required.", 422);
 
-  return prisma.$transaction(async (tx) => {
-    const req = await tx.parkingRequest.findUniqueOrThrow({ where: { id: requestId } });
-    if (req.status !== "Approved") throw new WorkflowError('Requires Status = "Approved".', 409);
-    if (req.slotStatus === "Assigned") throw new WorkflowError("A slot is already assigned.", 409);
+  return repos.parkingRequests.transition(requestId, {
+    plan: async (req, reads) => {
+      if (req.status !== "Approved") throw new WorkflowError('Requires Status = "Approved".', 409);
+      if (req.slotStatus === "Assigned") throw new WorkflowError("A slot is already assigned.", 409);
 
-    const space = await tx.parkingSpace.findUnique({ where: { id: parkingSpaceId } });
-    if (!space || !space.isActive) throw new WorkflowError("That parking space isn't available.", 404);
+      const space = await reads.findParkingSpaceById(parkingSpaceId);
+      if (!space || !space.isActive) throw new WorkflowError("That parking space isn't available.", 404);
 
-    const conflict = await findConflictingBooking(tx, parkingSpaceId, req.requiredStartDate, req.endDate, requestId);
-    if (conflict) {
-      throw new WorkflowError("That parking space is already booked for an overlapping period.", 409);
-    }
-
-    const assignedSlot = `${space.location} — ${space.slotNumber}`;
-
-    await tx.parkingRequest.update({
-      where: { id: requestId },
-      data: {
-        slotStatus: "Assigned",
-        assignedSlot,
+      // Availability is DERIVED from overlapping bookings — never a stored flag
+      // on the space itself.
+      const conflict = await reads.findConflictingBooking({
         parkingSpaceId,
-        slotAssignmentDate: new Date(),
-        assignedById: actor.sub,
-      },
-    });
-    await logEvent(tx, requestId, "WF05", "Unassigned", "Assigned", actor.sub, `Slot ${assignedSlot}`);
+        start: req.requiredStartDate,
+        end: req.endDate,
+        excludeRequestId: requestId,
+      });
+      if (conflict) {
+        throw new WorkflowError("That parking space is already booked for an overlapping period.", 409);
+      }
 
+      // A human-readable snapshot kept for display/audit even if the
+      // ParkingSpace row is later removed; parkingSpaceId is the real pointer.
+      const assignedSlot = `${space.location} — ${space.slotNumber}`;
+
+      return {
+        patch: {
+          slotStatus: "Assigned",
+          assignedSlot,
+          parkingSpaceId,
+          slotAssignmentDate: new Date(),
+          assignedById: actor.sub,
+        },
+        event: {
+          workflow: "WF05",
+          fromStatus: "Unassigned",
+          toStatus: "Assigned",
+          actorId: actor.sub,
+          note: `Slot ${assignedSlot}`,
+        },
+      };
+    },
     // WF05 never checks Payment Status itself (BR-006) — same single
     // join-workflow hand-off as WF04.
-    return wf06CheckCompletion(tx, requestId);
+    andThen: wf06CompletionSpec,
   });
 }
 
@@ -447,98 +457,107 @@ export async function wf05AssignSlot(requestId: string, actor: SessionPayload, p
 // normal forward flow — reverting either isn't in scope here.
 // (REVERTIBLE_STATUSES itself lives in types.ts — RevertPhaseAction, a
 // client component, needs it too, and this file pulls in server-only
-// Prisma code that can't be bundled client-side.)
+// data-access code that can't be bundled client-side.)
 
 export async function wfDevRevertPhase(requestId: string, actor: SessionPayload) {
   if (actor.role !== "DEVELOPER") throw new WorkflowError("Only a Developer can revert a request's phase.", 403);
 
-  return prisma.$transaction(async (tx) => {
-    const req = await tx.parkingRequest.findUniqueOrThrow({ where: { id: requestId } });
+  return repos.parkingRequests.transition(requestId, {
+    plan: (req) => {
+      if (req.status === "Pending Approval") {
+        // Undo WF02 (In Preparation -> Pending Approval).
+        return {
+          patch: { status: "In Preparation", approvalStage: "Prepared By", preparedById: null },
+          event: {
+            workflow: "DEV_REVERT",
+            fromStatus: "Pending Approval",
+            toStatus: "In Preparation",
+            actorId: actor.sub,
+            note: "Reverted 1 phase by Developer",
+          },
+        };
+      }
 
-    if (req.status === "Pending Approval") {
-      // Undo WF02 (In Preparation -> Pending Approval).
-      const updated = await tx.parkingRequest.update({
-        where: { id: requestId },
-        data: { status: "In Preparation", approvalStage: "Prepared By", preparedById: null },
-      });
-      await logEvent(tx, requestId, "DEV_REVERT", "Pending Approval", "In Preparation", actor.sub, "Reverted 1 phase by Developer");
-      return updated;
-    }
+      if (req.status === "Approved") {
+        // Undo WF03 approve (Pending Approval -> Approved). Also strip
+        // anything that's only valid while Approved (BR-006 payment/slot
+        // tracks + the WF03 rate snapshot) — none of it belongs on a request
+        // sitting at Pending Approval.
+        return {
+          patch: {
+            status: "Pending Approval",
+            approvalStage: "Validated By",
+            approvalDecision: null,
+            validatedById: null,
+            validatedDate: null,
+            rateVersionId: null,
+            rateAmountSnapshot: null,
+            rateSnapshotDate: null,
+            totalPaymentDue: null,
+            paymentStatus: "Not Started",
+            cashierId: null,
+            payDate: null,
+            officialReceiptReference: null,
+            slotStatus: "Unassigned",
+            assignedSlot: null,
+            parkingSpaceId: null,
+            slotAssignmentDate: null,
+            assignedById: null,
+          },
+          event: {
+            workflow: "DEV_REVERT",
+            fromStatus: "Approved",
+            toStatus: "Pending Approval",
+            actorId: actor.sub,
+            note: "Reverted 1 phase by Developer (payment/slot/rate snapshot cleared)",
+          },
+        };
+      }
 
-    if (req.status === "Approved") {
-      // Undo WF03 approve (Pending Approval -> Approved). Also strip
-      // anything that's only valid while Approved (BR-006 payment/slot
-      // tracks + the WF03 rate snapshot) — none of it belongs on a request
-      // sitting at Pending Approval.
-      const updated = await tx.parkingRequest.update({
-        where: { id: requestId },
-        data: {
-          status: "Pending Approval",
-          approvalStage: "Validated By",
-          approvalDecision: null,
-          validatedById: null,
-          validatedDate: null,
-          rateVersionId: null,
-          rateAmountSnapshot: null,
-          rateSnapshotDate: null,
-          totalPaymentDue: null,
-          paymentStatus: "Not Started",
-          cashierId: null,
-          payDate: null,
-          officialReceiptReference: null,
-          slotStatus: "Unassigned",
-          assignedSlot: null,
-          parkingSpaceId: null,
-          slotAssignmentDate: null,
-          assignedById: null,
-        },
-      });
-      await logEvent(
-        tx,
-        requestId,
-        "DEV_REVERT",
-        "Approved",
-        "Pending Approval",
-        actor.sub,
-        "Reverted 1 phase by Developer (payment/slot/rate snapshot cleared)"
-      );
-      return updated;
-    }
+      if (req.status === "Completed") {
+        // Undo WF06 (Approved -> Completed). Payment/slot stay intact here —
+        // they were legitimately confirmed while Approved; that's exactly
+        // what triggered completion, so there's nothing to unwind.
+        return {
+          patch: { status: "Approved", approvalStage: "Post-Approval", completedDate: null },
+          event: {
+            workflow: "DEV_REVERT",
+            fromStatus: "Completed",
+            toStatus: "Approved",
+            actorId: actor.sub,
+            note: "Reverted 1 phase by Developer",
+          },
+        };
+      }
 
-    if (req.status === "Completed") {
-      // Undo WF06 (Approved -> Completed). Payment/slot stay intact here —
-      // they were legitimately confirmed while Approved; that's exactly
-      // what triggered completion, so there's nothing to unwind.
-      const updated = await tx.parkingRequest.update({
-        where: { id: requestId },
-        data: { status: "Approved", approvalStage: "Post-Approval", completedDate: null },
-      });
-      await logEvent(tx, requestId, "DEV_REVERT", "Completed", "Approved", actor.sub, "Reverted 1 phase by Developer");
-      return updated;
-    }
-
-    throw new WorkflowError(`No previous phase to revert to from status "${req.status}".`, 409);
+      throw new WorkflowError(`No previous phase to revert to from status "${req.status}".`, 409);
+    },
   });
 }
 
 // --- Cancellation (reachable from any non-terminal state) -------------------------
 
 export async function cancelRequest(requestId: string, actor: SessionPayload) {
-  return prisma.$transaction(async (tx) => {
-    const req = await tx.parkingRequest.findUniqueOrThrow({ where: { id: requestId } });
-    if (req.status === "Completed" || req.status === "Cancelled") {
-      throw new WorkflowError(`Cannot cancel a request that is already ${req.status}.`, 409);
-    }
-    // Prepared By is deliberately excluded — they prepare/endorse or edit
-    // details, but cancellation isn't their call to make. Requestors never
-    // log in, so there's no owner-initiated path here either.
-    if (actor.role === "PREPARED_BY") throw new WorkflowError("Not permitted to cancel this request.", 403);
+  return repos.parkingRequests.transition(requestId, {
+    plan: (req) => {
+      if (req.status === "Completed" || req.status === "Cancelled") {
+        throw new WorkflowError(`Cannot cancel a request that is already ${req.status}.`, 409);
+      }
+      // Prepared By is deliberately excluded — they prepare/endorse or edit
+      // details, but cancellation isn't their call to make. Requestors never
+      // log in, so there's no owner-initiated path here either.
+      if (actor.role === "PREPARED_BY") throw new WorkflowError("Not permitted to cancel this request.", 403);
 
-    const updated = await tx.parkingRequest.update({
-      where: { id: requestId },
-      data: { status: "Cancelled" },
-    });
-    await logEvent(tx, requestId, "CANCEL", req.status, "Cancelled", actor.sub);
-    return updated;
+      return {
+        patch: { status: "Cancelled" },
+        event: {
+          workflow: "CANCEL",
+          fromStatus: req.status,
+          toStatus: "Cancelled",
+          actorId: actor.sub,
+          note: null,
+        },
+      };
+    },
   });
 }

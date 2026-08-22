@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireRole, requireSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { repos } from "@/lib/data";
 import { handleApiError } from "@/lib/api-helpers";
 import { SERVICE_TYPES } from "@/lib/types";
 
@@ -21,10 +21,7 @@ const createSchema = z.object({
 export async function GET() {
   try {
     await requireSession();
-    const entries = await prisma.rateTableEntry.findMany({
-      orderBy: [{ serviceType: "asc" }, { effectiveStartDate: "desc" }],
-      include: { createdBy: { select: { name: true } } },
-    });
+    const entries = await repos.rateTable.listAll();
     return NextResponse.json({ entries });
   } catch (err) {
     return handleApiError(err);
@@ -40,9 +37,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: parsed.error.issues.map((i) => i.message).join("; ") }, { status: 422 });
     }
     // Append-only: this is always an INSERT, never an UPDATE of an existing row.
-    const entry = await prisma.rateTableEntry.create({
-      data: { ...parsed.data, createdById: session.sub },
-    });
+    const entry = await repos.rateTable.create({ ...parsed.data, createdById: session.sub });
     return NextResponse.json({ entry }, { status: 201 });
   } catch (err) {
     return handleApiError(err);

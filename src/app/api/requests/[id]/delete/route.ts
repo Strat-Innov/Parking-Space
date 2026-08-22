@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { repos } from "@/lib/data";
 import { handleApiError } from "@/lib/api-helpers";
 
 // Developer-only, permanent. Unlike Cancel (which just sets Status =
@@ -14,13 +14,10 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     await requireRole("DEVELOPER");
     const { id } = await params;
 
-    const request = await prisma.parkingRequest.findUnique({ where: { id } });
+    const request = await repos.parkingRequests.findById(id);
     if (!request) return NextResponse.json({ error: "Request not found." }, { status: 404 });
 
-    await prisma.$transaction([
-      prisma.requestEvent.deleteMany({ where: { requestId: id } }),
-      prisma.parkingRequest.delete({ where: { id } }),
-    ]);
+    await repos.parkingRequests.deleteWithEvents(id);
 
     return NextResponse.json({ ok: true });
   } catch (err) {

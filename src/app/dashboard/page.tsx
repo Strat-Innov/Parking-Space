@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { repos } from "@/lib/data";
 import { isActionable } from "@/lib/dashboard";
 import StatusBadge from "@/components/StatusBadge";
 import OtherRequestsPanel from "@/components/OtherRequestsPanel";
 import { ROLE_LABELS, type Role } from "@/lib/types";
-import type { ParkingRequest } from "@prisma/client";
+import type { ParkingRequestRecord } from "@/lib/data/types";
 
-type Row = ParkingRequest & { requester: { name: string } };
+type Row = ParkingRequestRecord & { requester: { name: string } };
 
 function RequestsTable({ requests, emptyLabel }: { requests: Row[]; emptyLabel: string }) {
   return (
@@ -72,10 +72,7 @@ export default async function DashboardPage() {
   if (!session) redirect("/login");
   const role = session.role as Role;
 
-  const requests = await prisma.parkingRequest.findMany({
-    orderBy: { createdAt: "desc" },
-    include: { requester: { select: { name: true } } },
-  });
+  const requests = await repos.parkingRequests.listAllWithRequesterName();
 
   const actionable = requests.filter((r) => isActionable(role, r));
   const rest = requests.filter((r) => !isActionable(role, r));

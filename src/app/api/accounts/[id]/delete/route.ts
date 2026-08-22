@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { repos } from "@/lib/data";
 import { handleApiError } from "@/lib/api-helpers";
 import { getAccountHistoryBreakdown, describeAccountHistory } from "@/lib/accountDeletion";
 
@@ -18,7 +18,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: "You can't delete your own account." }, { status: 403 });
     }
 
-    const user = await prisma.user.findUnique({ where: { id } });
+    const user = await repos.users.findById(id);
     if (!user) return NextResponse.json({ error: "Account not found." }, { status: 404 });
 
     const breakdown = await getAccountHistoryBreakdown(id);
@@ -33,11 +33,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // rateTableEntries/parkingSpaces createdBy is attribution only, not a
     // workflow dependency (see accountDeletion.ts) — null it out rather
     // than block the delete on it.
-    await prisma.$transaction([
-      prisma.rateTableEntry.updateMany({ where: { createdById: id }, data: { createdById: null } }),
-      prisma.parkingSpace.updateMany({ where: { createdById: id }, data: { createdById: null } }),
-      prisma.user.delete({ where: { id } }),
-    ]);
+    await repos.users.deleteWithAttributionCleared(id);
     return NextResponse.json({ ok: true });
   } catch (err) {
     return handleApiError(err);

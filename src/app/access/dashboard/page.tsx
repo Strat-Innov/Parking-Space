@@ -1,16 +1,16 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { repos } from "@/lib/data";
 import StatusBadge from "@/components/StatusBadge";
 import { ROLE_LABELS, type Role } from "@/lib/types";
-import type { AccessRequest } from "@prisma/client";
+import type { AccessRequestRecord } from "@/lib/data/types";
 
-type Row = AccessRequest & { requester: { name: string } };
+type Row = AccessRequestRecord & { requester: { name: string } };
 
 // Only Parking Management has anything to do (AWF02/AWF03) — everyone else
 // can still view everything, same as Parking Space's dashboard.
-function isActionable(role: Role, r: Pick<AccessRequest, "status">) {
+function isActionable(role: Role, r: Pick<AccessRequestRecord, "status">) {
   return role === "PARKING_MANAGEMENT" && (r.status === "Submitted" || r.status === "Processed");
 }
 
@@ -68,10 +68,7 @@ export default async function AccessDashboardPage() {
   if (!session) redirect("/login");
   const role = session.role as Role;
 
-  const requests = await prisma.accessRequest.findMany({
-    orderBy: { createdAt: "desc" },
-    include: { requester: { select: { name: true } } },
-  });
+  const requests = await repos.accessRequests.listAllWithRequesterName();
 
   const actionable = requests.filter((r) => isActionable(role, r));
   const rest = requests.filter((r) => !isActionable(role, r));

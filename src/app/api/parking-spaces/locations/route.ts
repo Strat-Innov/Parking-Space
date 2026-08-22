@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { repos } from "@/lib/data";
 import { handleApiError } from "@/lib/api-helpers";
 
 // Public — no requireSession(). This feeds the Preferred Parking Location
@@ -8,13 +8,8 @@ import { handleApiError } from "@/lib/api-helpers";
 // (slot numbers, occupancy, who added them).
 export async function GET() {
   try {
-    const spaces = await prisma.parkingSpace.findMany({
-      where: { isActive: true },
-      select: { location: true },
-      distinct: ["location"],
-      orderBy: { location: "asc" },
-    });
-    return NextResponse.json({ locations: spaces.map((s) => s.location) });
+    const locations = await repos.parkingSpaces.listDistinctActiveLocations();
+    return NextResponse.json({ locations });
   } catch (err) {
     return handleApiError(err);
   }

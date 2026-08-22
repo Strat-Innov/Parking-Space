@@ -1,7 +1,7 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
-import { prisma } from "./prisma";
+import { repos } from "./data";
 import type { Role } from "./types";
 
 const COOKIE_NAME = "parking_session";
@@ -73,7 +73,7 @@ export async function requireRole(...roles: Role[]): Promise<SessionPayload> {
 export class AuthError extends Error {}
 
 export async function verifyCredentials(email: string, password: string) {
-  const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+  const user = await repos.users.findByEmail(email.toLowerCase());
   if (!user) return null;
   const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) return null;

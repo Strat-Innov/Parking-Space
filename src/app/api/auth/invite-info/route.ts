@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { repos } from "@/lib/data";
 import { handleApiError } from "@/lib/api-helpers";
 import { ROLE_LABELS, type Role } from "@/lib/types";
 
@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
     const token = req.nextUrl.searchParams.get("token");
     if (!token) return NextResponse.json({ error: "Missing token." }, { status: 400 });
 
-    const user = await prisma.user.findUnique({ where: { emailVerificationToken: token } });
+    const user = await repos.users.findByVerificationToken(token);
     if (
       !user ||
       user.hasPassword ||

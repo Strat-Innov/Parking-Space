@@ -1,9 +1,9 @@
-import type { ParkingRequest } from "@prisma/client";
+import type { ParkingRequestRecord } from "@/lib/data/types";
 import type { Role } from "@/lib/types";
 
 // Shared between the dashboard page and the export route so "Other
 // Requests" means exactly the same set of rows in both places.
-export function isActionable(role: Role, r: Pick<ParkingRequest, "status" | "paymentStatus" | "slotStatus">) {
+export function isActionable(role: Role, r: Pick<ParkingRequestRecord, "status" | "paymentStatus" | "slotStatus">) {
   switch (role) {
     case "PREPARED_BY":
       // WF02 (prepare/endorse) and WF04 (confirm payment) both land here now.

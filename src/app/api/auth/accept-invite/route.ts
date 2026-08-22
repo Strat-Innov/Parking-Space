@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
+import { repos } from "@/lib/data";
 import { handleApiError } from "@/lib/api-helpers";
 
 const schema = z.object({
@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: parsed.error.issues.map((i) => i.message).join("; ") }, { status: 422 });
     }
 
-    const user = await prisma.user.findUnique({ where: { emailVerificationToken: parsed.data.token } });
+    const user = await repos.users.findByVerificationToken(parsed.data.token);
     if (
       !user ||
       user.hasPassword ||
@@ -29,15 +29,12 @@ export async function POST(req: NextRequest) {
     }
 
     const passwordHash = await bcrypt.hash(parsed.data.password, 10);
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        passwordHash,
-        hasPassword: true,
-        emailVerifiedAt: new Date(),
-        emailVerificationToken: null,
-        emailVerificationTokenExpiresAt: null,
-      },
+    await repos.users.update(user.id, {
+      passwordHash,
+      hasPassword: true,
+      emailVerifiedAt: new Date(),
+      emailVerificationToken: null,
+      emailVerificationTokenExpiresAt: null,
     });
 
     return NextResponse.json({ ok: true });

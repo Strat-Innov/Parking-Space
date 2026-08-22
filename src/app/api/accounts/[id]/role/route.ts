@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireRole } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { repos } from "@/lib/data";
 import { handleApiError } from "@/lib/api-helpers";
 import { ASSIGNABLE_ROLES } from "@/lib/types";
 
@@ -34,14 +34,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: "Developer can't be combined with other roles." }, { status: 422 });
     }
 
-    const user = await prisma.user.findUnique({ where: { id } });
+    const user = await repos.users.findById(id);
     if (!user) return NextResponse.json({ error: "Account not found." }, { status: 404 });
 
-    const updated = await prisma.user.update({
-      where: { id },
-      data: { role: roles[0], roles },
-      select: { id: true, name: true, email: true, role: true, roles: true },
-    });
+    const updated = await repos.users.updateRoles(id, roles[0], roles);
     return NextResponse.json({ account: updated });
   } catch (err) {
     return handleApiError(err);

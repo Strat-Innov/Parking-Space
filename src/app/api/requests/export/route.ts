@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { requireSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { repos } from "@/lib/data";
 import { isActionable } from "@/lib/dashboard";
 import { handleApiError } from "@/lib/api-helpers";
 import { buildFillableForm, type PdfRequestData } from "@/lib/pdf/buildFillableForm";
@@ -31,13 +31,7 @@ export async function GET(req: NextRequest) {
     let filenameBase: string;
 
     if (singleId) {
-      const request = await prisma.parkingRequest.findUnique({
-        where: { id: singleId },
-        include: {
-          preparedBy: { select: { name: true } },
-          validatedBy: { select: { name: true } },
-        },
-      });
+      const request = await repos.parkingRequests.findForExportById(singleId);
       if (!request) return NextResponse.json({ error: "Not found" }, { status: 404 });
       rows = [request];
       filenameBase = `parking-request-${request.id}`;
@@ -53,13 +47,7 @@ export async function GET(req: NextRequest) {
       }
 
       const role = session.role as Role;
-      const all = await prisma.parkingRequest.findMany({
-        orderBy: { createdAt: "desc" },
-        include: {
-          preparedBy: { select: { name: true } },
-          validatedBy: { select: { name: true } },
-        },
-      });
+      const all = await repos.parkingRequests.listAllForExport();
 
       rows = all.filter((r) => {
         if (isActionable(role, r)) return false;

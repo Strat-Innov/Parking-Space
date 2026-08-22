@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireRole } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { repos } from "@/lib/data";
 import { handleApiError } from "@/lib/api-helpers";
 
 const MAINTAINERS = ["PARKING_MANAGEMENT", "PREPARED_BY", "VALIDATED_BY", "DEVELOPER"] as const;
@@ -25,17 +25,13 @@ export async function POST(req: NextRequest) {
     const { location } = parsed.data;
     const requested = Array.from(new Set(parsed.data.slotNumbers.map((s) => s.trim()).filter(Boolean)));
 
-    const existing = await prisma.parkingSpace.findMany({
-      where: { location, slotNumber: { in: requested }, isActive: true },
-      select: { slotNumber: true },
-    });
-    const existingSet = new Set(existing.map((e) => e.slotNumber));
+    const existingSet = await repos.parkingSpaces.findActiveSlotNumbers(location, requested);
     const toCreate = requested.filter((s) => !existingSet.has(s));
 
     if (toCreate.length > 0) {
-      await prisma.parkingSpace.createMany({
-        data: toCreate.map((slotNumber) => ({ location, slotNumber, createdById: session.sub })),
-      });
+      await repos.parkingSpaces.createMany(
+        toCreate.map((slotNumber) => ({ location, slotNumber, createdById: session.sub })),
+      );
     }
 
     return NextResponse.json(

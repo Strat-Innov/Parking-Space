@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { repos } from "@/lib/data";
 import CreateAccountForm from "@/components/CreateAccountForm";
 import InviteStaffForm from "@/components/InviteStaffForm";
 import AccountActivateAction from "@/components/AccountActivateAction";
@@ -21,10 +21,7 @@ export default async function AccountsPage() {
   if (!session) redirect("/login");
   const isDeveloper = session.role === "DEVELOPER";
 
-  const accounts = await prisma.user.findMany({
-    where: { role: { in: [...STAFF_ROLES, "DEVELOPER"] as unknown as string[] } },
-    orderBy: { createdAt: "desc" },
-  });
+  const accounts = await repos.users.listByRoles([...STAFF_ROLES, "DEVELOPER"]);
 
   return (
     <div className="space-y-6">

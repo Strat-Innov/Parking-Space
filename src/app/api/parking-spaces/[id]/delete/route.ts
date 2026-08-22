@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { repos } from "@/lib/data";
 import { handleApiError } from "@/lib/api-helpers";
 
 // Developer-only, permanent — distinct from the normal soft "remove" (which
@@ -14,10 +14,10 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     await requireRole("DEVELOPER");
     const { id } = await params;
 
-    const space = await prisma.parkingSpace.findUnique({ where: { id } });
+    const space = await repos.parkingSpaces.findById(id);
     if (!space) return NextResponse.json({ error: "Parking space not found." }, { status: 404 });
 
-    const inUse = await prisma.parkingRequest.count({ where: { parkingSpaceId: id } });
+    const inUse = await repos.parkingRequests.countByParkingSpace(id);
     if (inUse > 0) {
       return NextResponse.json(
         { error: `Can't delete — ${inUse} request(s) reference this space, including past ones. Use Remove instead.` },
@@ -25,7 +25,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       );
     }
 
-    await prisma.parkingSpace.delete({ where: { id } });
+    await repos.parkingSpaces.delete(id);
     return NextResponse.json({ ok: true });
   } catch (err) {
     return handleApiError(err);

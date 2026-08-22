@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { repos } from "@/lib/data";
 import { handleApiError } from "@/lib/api-helpers";
 
 // Developer-only, permanent — the one exception to Rate Table's normal
@@ -14,10 +14,10 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     await requireRole("DEVELOPER");
     const { id } = await params;
 
-    const entry = await prisma.rateTableEntry.findUnique({ where: { id } });
+    const entry = await repos.rateTable.findById(id);
     if (!entry) return NextResponse.json({ error: "Rate entry not found." }, { status: 404 });
 
-    const inUse = await prisma.parkingRequest.count({ where: { rateVersionId: id } });
+    const inUse = await repos.parkingRequests.countByRateVersion(id);
     if (inUse > 0) {
       return NextResponse.json(
         { error: `Can't delete — ${inUse} request(s) snapshotted this rate version.` },
@@ -25,7 +25,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       );
     }
 
-    await prisma.rateTableEntry.delete({ where: { id } });
+    await repos.rateTable.delete(id);
     return NextResponse.json({ ok: true });
   } catch (err) {
     return handleApiError(err);

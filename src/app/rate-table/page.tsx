@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { repos } from "@/lib/data";
 import RateTableForm from "@/components/RateTableForm";
 import DeleteRateEntryAction from "@/components/DeleteRateEntryAction";
 import type { Role } from "@/lib/types";
@@ -11,10 +11,7 @@ export default async function RateTablePage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const entries = await prisma.rateTableEntry.findMany({
-    orderBy: [{ serviceType: "asc" }, { effectiveStartDate: "desc" }],
-    include: { createdBy: { select: { name: true } } },
-  });
+  const entries = await repos.rateTable.listAll();
 
   const canMaintain = MAINTAINERS.includes(session.role as Role);
   const isDeveloper = session.role === "DEVELOPER";

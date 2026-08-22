@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { repos } from "@/lib/data";
 import { getAppUrl } from "@/lib/url";
 
 // Visited directly from the link in the confirmation email — a GET with a
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  const user = await prisma.user.findUnique({ where: { emailVerificationToken: token } });
+  const user = await repos.users.findByVerificationToken(token);
   // hasPassword false means this is actually an invite token (see
   // schema.prisma) — those are consumed at /accept-invite, which also sets
   // a real password. Confirming here without one would strand the account.
@@ -23,9 +23,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { emailVerifiedAt: new Date(), emailVerificationToken: null, emailVerificationTokenExpiresAt: null },
+  await repos.users.update(user.id, {
+    emailVerifiedAt: new Date(),
+    emailVerificationToken: null,
+    emailVerificationTokenExpiresAt: null,
   });
 
   loginUrl.searchParams.set("verified", "1");

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession, requireSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { repos } from "@/lib/data";
 import { submitAccessRequest } from "@/lib/access-workflows";
 import { handleApiError } from "@/lib/api-helpers";
 import { accessIntakeFieldsSchema } from "@/lib/access-validation";
@@ -12,10 +12,7 @@ import { resolveGuestRequesterId } from "@/lib/guest";
 export async function GET() {
   try {
     await requireSession();
-    const requests = await prisma.accessRequest.findMany({
-      orderBy: { createdAt: "desc" },
-      include: { requester: { select: { name: true, email: true } } },
-    });
+    const requests = await repos.accessRequests.listAllWithRequesterContact();
     return NextResponse.json({ requests });
   } catch (err) {
     return handleApiError(err);

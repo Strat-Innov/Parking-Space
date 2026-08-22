@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { repos } from "@/lib/data";
 import { findLockedSpaceIds } from "@/lib/workflows";
 import StatusBadge from "@/components/StatusBadge";
 import Timeline from "@/components/Timeline";
@@ -28,19 +28,7 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const request = await prisma.parkingRequest.findUnique({
-    where: { id },
-    include: {
-      requester: { select: { name: true, email: true } },
-      preparedBy: { select: { name: true } },
-      validatedBy: { select: { name: true } },
-      rejectedBy: { select: { name: true } },
-      cashier: { select: { name: true } },
-      assignedBy: { select: { name: true } },
-      rateVersion: true,
-      events: { orderBy: { createdAt: "asc" }, include: { actor: { select: { name: true, role: true } } } },
-    },
-  });
+  const request = await repos.parkingRequests.findDetailById(id);
 
   if (!request) notFound();
 
@@ -53,10 +41,7 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
   let availableSpaces: { id: string; location: string; slotNumber: string }[] = [];
   if (canAssignSlot) {
     const [spaces, lockedIds] = await Promise.all([
-      prisma.parkingSpace.findMany({
-        where: { isActive: true },
-        orderBy: [{ location: "asc" }, { slotNumber: "asc" }],
-      }),
+      repos.parkingSpaces.listActive(),
       findLockedSpaceIds(request.requiredStartDate, request.endDate, request.id),
     ]);
     availableSpaces = spaces.filter((s) => !lockedIds.has(s.id));

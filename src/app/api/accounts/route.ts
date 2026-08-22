@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { requireSession, requireRole } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { repos } from "@/lib/data";
 import { handleApiError } from "@/lib/api-helpers";
 import { ASSIGNABLE_ROLES } from "@/lib/types";
 
@@ -17,11 +17,7 @@ const createSchema = z.object({
 export async function GET() {
   try {
     await requireSession();
-    const accounts = await prisma.user.findMany({
-      where: { role: { in: ASSIGNABLE_ROLES as unknown as string[] } },
-      orderBy: { createdAt: "desc" },
-      select: { id: true, name: true, email: true, role: true, createdAt: true },
-    });
+    const accounts = await repos.users.listSummariesByRoles(ASSIGNABLE_ROLES);
     return NextResponse.json({ accounts });
   } catch (err) {
     return handleApiError(err);
@@ -38,7 +34,7 @@ export async function POST(req: NextRequest) {
     }
 
     const email = parsed.data.email.toLowerCase();
-    const existing = await prisma.user.findUnique({ where: { email } });
+    const existing = await repos.users.findByEmail(email);
     if (existing) {
       return NextResponse.json({ error: "An account with this email already exists." }, { status: 409 });
     }
@@ -46,10 +42,22 @@ export async function POST(req: NextRequest) {
     const passwordHash = await bcrypt.hash(parsed.data.password, 10);
     // Vouched for by the Developer adding them (requireRole above) — unlike
     // self-service /signup, no separate email confirmation step.
-    const account = await prisma.user.create({
-      data: { name: parsed.data.name, email, role: parsed.data.role, passwordHash, emailVerifiedAt: new Date() },
-      select: { id: true, name: true, email: true, role: true, createdAt: true },
+    const created = await repos.users.create({
+      name: parsed.data.name,
+      email,
+      role: parsed.data.role,
+      passwordHash,
+      emailVerifiedAt: new Date(),
     });
+    // Projected explicitly: the response has always carried these five fields
+    // and must never widen to the whole user row (which holds passwordHash).
+    const account = {
+      id: created.id,
+      name: created.name,
+      email: created.email,
+      role: created.role,
+      createdAt: created.createdAt,
+    };
     return NextResponse.json({ account }, { status: 201 });
   } catch (err) {
     return handleApiError(err);

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { repos } from "@/lib/data";
 import ParkingSpaceForm from "@/components/ParkingSpaceForm";
 import ParkingSpaceList from "@/components/ParkingSpaceList";
 import type { Role } from "@/lib/types";
@@ -11,10 +11,7 @@ export default async function ParkingLocationsPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const spaces = await prisma.parkingSpace.findMany({
-    orderBy: [{ location: "asc" }, { slotNumber: "asc" }],
-    include: { createdBy: { select: { name: true } } },
-  });
+  const spaces = await repos.parkingSpaces.listAll();
 
   // One query for every booking that could still matter (still running or
   // yet to start) — bucketed per space in memory below rather than a
@@ -22,22 +19,7 @@ export default async function ParkingLocationsPage() {
   // size. A space is only ever locked for the exact date range it's
   // actually booked, never permanently.
   const now = new Date();
-  const relevantBookings = await prisma.parkingRequest.findMany({
-    where: {
-      parkingSpaceId: { not: null },
-      slotStatus: "Assigned",
-      status: { not: "Cancelled" },
-      endDate: { gte: now },
-    },
-    select: {
-      parkingSpaceId: true,
-      companyName: true,
-      serviceType: true,
-      requiredStartDate: true,
-      endDate: true,
-    },
-    orderBy: { requiredStartDate: "asc" },
-  });
+  const relevantBookings = await repos.parkingRequests.listActiveBookingsFrom(now);
 
   const bookingsBySpace = new Map<string, typeof relevantBookings>();
   for (const b of relevantBookings) {

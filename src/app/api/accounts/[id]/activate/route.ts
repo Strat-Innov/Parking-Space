@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { requireSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { repos } from "@/lib/data";
 import { handleApiError } from "@/lib/api-helpers";
 
 // Manual fallback for when email delivery isn't available (e.g. sending
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: parsed.error.issues.map((i) => i.message).join("; ") }, { status: 422 });
     }
 
-    const user = await prisma.user.findUnique({ where: { id } });
+    const user = await repos.users.findById(id);
     if (!user) return NextResponse.json({ error: "Account not found." }, { status: 404 });
     if (user.emailVerifiedAt) return NextResponse.json({ error: "This account is already active." }, { status: 409 });
 
@@ -38,20 +38,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (!parsed.data.password) {
         return NextResponse.json({ error: "This account was invited and has no password yet — set one to activate it." }, { status: 422 });
       }
-      await prisma.user.update({
-        where: { id },
-        data: {
-          passwordHash: await bcrypt.hash(parsed.data.password, 10),
-          hasPassword: true,
-          emailVerifiedAt: new Date(),
-          emailVerificationToken: null,
-          emailVerificationTokenExpiresAt: null,
-        },
+      await repos.users.update(id, {
+        passwordHash: await bcrypt.hash(parsed.data.password, 10),
+        hasPassword: true,
+        emailVerifiedAt: new Date(),
+        emailVerificationToken: null,
+        emailVerificationTokenExpiresAt: null,
       });
     } else {
-      await prisma.user.update({
-        where: { id },
-        data: { emailVerifiedAt: new Date(), emailVerificationToken: null, emailVerificationTokenExpiresAt: null },
+      await repos.users.update(id, {
+        emailVerifiedAt: new Date(),
+        emailVerificationToken: null,
+        emailVerificationTokenExpiresAt: null,
       });
     }
 

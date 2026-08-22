@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireRole } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { repos } from "@/lib/data";
 import { handleApiError } from "@/lib/api-helpers";
 import { STAFF_ROLES } from "@/lib/types";
 import { createInviteToken, buildAcceptInviteUrl } from "@/lib/emailVerification";
@@ -39,22 +39,20 @@ export async function POST(req: NextRequest) {
       parsed.data.invites.map(async (invite) => {
         const email = invite.email.toLowerCase();
         try {
-          const existing = await prisma.user.findUnique({ where: { email } });
+          const existing = await repos.users.findByEmail(email);
           if (existing) {
             return { email, status: "skipped" as const, reason: "An account with this email already exists." };
           }
 
           const { token, expiresAt } = createInviteToken();
-          await prisma.user.create({
-            data: {
-              name: invite.name,
-              email,
-              role: invite.role,
-              passwordHash: await unusablePasswordHash(),
-              hasPassword: false,
-              emailVerificationToken: token,
-              emailVerificationTokenExpiresAt: expiresAt,
-            },
+          await repos.users.create({
+            name: invite.name,
+            email,
+            role: invite.role,
+            passwordHash: await unusablePasswordHash(),
+            hasPassword: false,
+            emailVerificationToken: token,
+            emailVerificationTokenExpiresAt: expiresAt,
           });
           await sendInviteEmail(email, invite.name, invite.role, buildAcceptInviteUrl(token));
           return { email, status: "sent" as const };

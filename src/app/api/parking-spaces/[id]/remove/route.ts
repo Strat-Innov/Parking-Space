@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { repos } from "@/lib/data";
 import { handleApiError } from "@/lib/api-helpers";
 import { WorkflowError } from "@/lib/workflows";
 
@@ -14,19 +14,17 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     await requireRole(...MAINTAINERS);
     const { id } = await params;
 
-    const space = await prisma.parkingSpace.findUnique({ where: { id } });
+    const space = await repos.parkingSpaces.findById(id);
     if (!space) return NextResponse.json({ error: "Not found" }, { status: 404 });
     if (!space.isActive) return NextResponse.json({ space });
 
     const now = new Date();
-    const upcomingBooking = await prisma.parkingRequest.findFirst({
-      where: { parkingSpaceId: id, slotStatus: "Assigned", status: { not: "Cancelled" }, endDate: { gte: now } },
-    });
+    const upcomingBooking = await repos.parkingRequests.findUpcomingBookingForSpace(id, now);
     if (upcomingBooking) {
       throw new WorkflowError("Can't remove — this space has a current or upcoming booking.", 409);
     }
 
-    const updated = await prisma.parkingSpace.update({ where: { id }, data: { isActive: false } });
+    const updated = await repos.parkingSpaces.update(id, { isActive: false });
     return NextResponse.json({ space: updated });
   } catch (err) {
     return handleApiError(err);

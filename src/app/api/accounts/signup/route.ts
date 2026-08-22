@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
+import { repos } from "@/lib/data";
 import { handleApiError } from "@/lib/api-helpers";
 import { isEmailDomainAllowedForSignup } from "@/lib/signup";
 import { createVerificationToken, buildConfirmUrl } from "@/lib/emailVerification";
@@ -34,22 +34,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const existing = await prisma.user.findUnique({ where: { email } });
+    const existing = await repos.users.findByEmail(email);
     if (existing) {
       return NextResponse.json({ error: "An account with this email already exists." }, { status: 409 });
     }
 
     const passwordHash = await bcrypt.hash(parsed.data.password, 10);
     const { token, expiresAt } = createVerificationToken();
-    await prisma.user.create({
-      data: {
-        name: parsed.data.name,
-        email,
-        role: "PREPARED_BY",
-        passwordHash,
-        emailVerificationToken: token,
-        emailVerificationTokenExpiresAt: expiresAt,
-      },
+    await repos.users.create({
+      name: parsed.data.name,
+      email,
+      role: "PREPARED_BY",
+      passwordHash,
+      emailVerificationToken: token,
+      emailVerificationTokenExpiresAt: expiresAt,
     });
 
     try {

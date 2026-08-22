@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { repos } from "@/lib/data";
 import { handleApiError } from "@/lib/api-helpers";
 
 // Developer-only (unlike add/invite, which stays open to any staff member).
@@ -14,10 +14,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: "You can't deactivate your own account." }, { status: 403 });
     }
 
-    const user = await prisma.user.findUnique({ where: { id } });
+    const user = await repos.users.findById(id);
     if (!user) return NextResponse.json({ error: "Account not found." }, { status: 404 });
 
-    await prisma.user.update({ where: { id }, data: { active: false } });
+    await repos.users.update(id, { active: false });
     return NextResponse.json({ ok: true });
   } catch (err) {
     return handleApiError(err);

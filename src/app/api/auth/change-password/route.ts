@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { requireSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { repos } from "@/lib/data";
 import { handleApiError } from "@/lib/api-helpers";
 
 const schema = z.object({
@@ -19,14 +19,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: parsed.error.issues.map((i) => i.message).join("; ") }, { status: 422 });
     }
 
-    const user = await prisma.user.findUniqueOrThrow({ where: { id: session.sub } });
+    const user = await repos.users.findByIdOrThrow(session.sub);
     const currentOk = await bcrypt.compare(parsed.data.currentPassword, user.passwordHash);
     if (!currentOk) {
       return NextResponse.json({ error: "Current password is incorrect." }, { status: 401 });
     }
 
     const passwordHash = await bcrypt.hash(parsed.data.newPassword, 10);
-    await prisma.user.update({ where: { id: session.sub }, data: { passwordHash } });
+    await repos.users.update(session.sub, { passwordHash });
 
     return NextResponse.json({ ok: true });
   } catch (err) {

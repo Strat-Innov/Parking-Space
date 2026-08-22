@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { repos } from "@/lib/data";
 import StatusBadge from "@/components/StatusBadge";
 import Timeline from "@/components/Timeline";
 import AccessProcessForm from "@/components/AccessProcessForm";
@@ -22,16 +22,7 @@ export default async function AccessRequestDetailPage({ params }: { params: Prom
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const request = await prisma.accessRequest.findUnique({
-    where: { id },
-    include: {
-      requester: { select: { name: true, email: true } },
-      processedBy: { select: { name: true } },
-      completedBy: { select: { name: true } },
-      cancelledBy: { select: { name: true } },
-      events: { orderBy: { createdAt: "asc" }, include: { actor: { select: { name: true, role: true } } } },
-    },
-  });
+  const request = await repos.accessRequests.findDetailById(id);
 
   if (!request) notFound();
 

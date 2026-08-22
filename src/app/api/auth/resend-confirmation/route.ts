@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/prisma";
+import { repos } from "@/lib/data";
 import { handleApiError } from "@/lib/api-helpers";
 import { createVerificationToken, createInviteToken, buildConfirmUrl, buildAcceptInviteUrl } from "@/lib/emailVerification";
 import { sendConfirmationEmail, sendInviteEmail } from "@/lib/email";
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     }
 
     const email = parsed.data.email.toLowerCase();
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await repos.users.findByEmail(email);
     if (!user || user.emailVerifiedAt) {
       return NextResponse.json(GENERIC_OK);
     }
@@ -33,16 +33,16 @@ export async function POST(req: NextRequest) {
     // stranding the account (see schema.prisma comment on hasPassword).
     if (user.hasPassword) {
       const { token, expiresAt } = createVerificationToken();
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { emailVerificationToken: token, emailVerificationTokenExpiresAt: expiresAt },
+      await repos.users.update(user.id, {
+        emailVerificationToken: token,
+        emailVerificationTokenExpiresAt: expiresAt,
       });
       await sendConfirmationEmail(email, user.name, buildConfirmUrl(token));
     } else {
       const { token, expiresAt } = createInviteToken();
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { emailVerificationToken: token, emailVerificationTokenExpiresAt: expiresAt },
+      await repos.users.update(user.id, {
+        emailVerificationToken: token,
+        emailVerificationTokenExpiresAt: expiresAt,
       });
       await sendInviteEmail(email, user.name, user.role as Role, buildAcceptInviteUrl(token));
     }

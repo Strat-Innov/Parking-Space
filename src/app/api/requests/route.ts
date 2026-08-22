@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession, requireSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { repos } from "@/lib/data";
 import { submitRequest } from "@/lib/workflows";
 import { handleApiError } from "@/lib/api-helpers";
 import { intakeFieldsSchema } from "@/lib/validation";
@@ -13,10 +13,7 @@ export async function GET() {
   try {
     await requireSession();
 
-    const requests = await prisma.parkingRequest.findMany({
-      orderBy: { createdAt: "desc" },
-      include: { requester: { select: { name: true, email: true } } },
-    });
+    const requests = await repos.parkingRequests.listAllWithRequesterContact();
     return NextResponse.json({ requests });
   } catch (err) {
     return handleApiError(err);
