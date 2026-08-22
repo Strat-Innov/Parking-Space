@@ -64,8 +64,8 @@ plus `db:push`, `db:seed`, `db:reset` scripts and a `prisma.seed` hook.
 | Tier | Files | What they do |
 |---|---|---|
 | Data/workflow layer | `src/lib/{workflows,access-workflows,auth,guest,accountDeletion,prisma}.ts` | All business-rule writes, all transactions |
-| API routes | 30 of 38 route files | Thin: auth check → zod parse → workflow call → JSON |
-| Server components | 8 page files (`dashboard`, `requests/[id]`, `access/[id]`, `access/dashboard`, `accounts`, `parking-locations`, `rate-table`) | **Query Prisma directly at render time** |
+| API routes | 26 of 38 route files | Thin: auth check → zod parse → workflow call → JSON |
+| Server components | 7 page files (`dashboard`, `requests/[id]`, `access/[id]`, `access/dashboard`, `accounts`, `parking-locations`, `rate-table`) | **Query Prisma directly at render time** |
 
 That third tier matters most: pages like `src/app/dashboard/page.tsx:75` call
 `prisma.parkingRequest.findMany({ include: { requester: … } })` inside the React
@@ -424,8 +424,9 @@ GitHub Pages is viable at all.
 `output: 'export'` refuses to build with any `route.ts` present. All 43 must be
 deleted and their logic moved into the browser (or into Power Automate flows).
 
-### 10.3 BLOCKER — 11 server components query the database at render time
-Static export cannot run `cookies()` (`auth.ts:32,43,48`) or a database query
+### 10.3 BLOCKER — server components query the database at render time
+7 of the 11 server pages query Prisma inside the component, and all 11 read
+cookies. Static export cannot run `cookies()` (`auth.ts:32,43,48`) or a database query
 during render. Every server page becomes a client component with a loading state.
 `redirect("/login")` (10 sites) becomes client-side routing; `notFound()`
 (2 sites) becomes a client 404.
