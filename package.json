@@ -9,7 +9,11 @@
     "lint": "next lint",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "db:reset": "prisma db push --force-reset && tsx prisma/seed.ts"
+    "db:reset": "prisma db push --force-reset && tsx prisma/seed.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:db:push": "node scripts/test-db-push.mjs",
+    "typecheck": "tsc --noEmit"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -37,6 +41,8 @@
     "prisma": "^5.19.1",
     "tailwindcss": "^3.4.4",
     "tsx": "^4.16.2",
-    "typescript": "^5.5.2"
+    "typescript": "^5.5.2",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^2.1.9"
   }
 }
